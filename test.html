@@ -1,0 +1,240 @@
+'use client';
+
+import { useState, ChangeEvent } from 'react';
+import Papa from 'papaparse';
+import axios from 'axios';
+import { useQuery } from '@tanstack/react-query';
+
+interface PlayerRanking {
+  Player: string;
+  Age: number;
+  Tm: string;
+  POS: string;
+  ADP: string;
+  'fADP': number; // Projected ADP or similar from your CSV
+  'f4YR': number; // 4-year average projection
+  avg: number; // Average projection
+  // Add more fields from your CSV as needed, e.g., 'Proj', 'Snap %', etc.
+}
+
+interface SleeperPick {
+  round: number;
+  draft_slot: number;
+  pick_no: number;
+  player_id: string;
+  picked_by: string;
+  metadata: { first_name: string; last_name: string; position: string; team: string };
+}
+
+interface SleeperUser {
+  user_id: string;
+  display_name: string;
+}
+
+interface SleeperDraft {
+  draft_id: string;
+  league_id: string;
+  status: string;
+  // Add more as needed
+}
+
+const fetchSleeperPlayers = async () => {
+  const response = await axios.get('https://api.sleeper.app/v1/players/nfl');
+  return response.data; // Map of player_id to details { full_name, position, etc. }
+};
+
+const fetchDraftPicks = async (draftId: string) => {
+  const response = await axios.get(`https://api.sleeper.app/v1/draft/${draftId}/picks`);
+  return response.data as SleeperPick[];
+};
+
+const fetchDraftUsers = async (leagueId: string) => {
+  const response = await axios.get(`https://api.sleeper.app/v1/league/${leagueId}/users`);
+  return response.data as SleeperUser[];
+};
+
+const fetchDraftMetadata = async (draftId: string) => {
+  const response = await axios.get(`https://api.sleeper.app/v1/draft/${draftId}`);
+  return response.data as SleeperDraft;
+};
+
+export default function Home() {
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [rankings, setRankings] = useState<PlayerRanking[]>([]);
+  const [draftUrl, setDraftUrl] = useState('');
+  const [draftId, setDraftId] = useState('');
+  const [leagueId, setLeagueId] = useState('');
+  const [sleeperPlayers, setSleeperPlayers] = useState<Record<string, any>>({});
+  const [error, setError] = useState('');
+
+  // Load Sleeper players once on mount
+  useQuery({
+    queryKey: ['sleeperPlayers'],
+    queryFn: fetchSleeperPlayers,
+    onSuccess: (data) => setSleeperPlayers(data),
+    staleTime: Infinity, // Cache forever
+  });
+
+  // Poll draft picks every 10 seconds if draftId is set
+  const { data: picks = [] } = useQuery({
+    queryKey: ['draftPicks', draftId],
+    queryFn: () => fetchDraftPicks(draftId),
+    enabled: !!draftId,
+    refetchInterval: 10000, // 10 seconds
+  });
+
+  // Fetch users once when leagueId is set
+  const { data: users = [] } = useQuery({
+    queryKey: ['draftUsers', leagueId],
+    queryFn: () => fetchDraftUsers(leagueId),
+    enabled: !!leagueId,
+  });
+
+  // Fetch draft metadata to get league_id
+  useQuery({
+    queryKey: ['draftMetadata', draftId],
+    queryFn: () => fetchDraftMetadata(draftId),
+    enabled: !!draftId,
+    onSuccess: (data) => setLeagueId(data.league_id),
+  });
+
+  const handleCsvUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCsvFile(file);
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          // Skip the first row if it's the title ("Player, Age, Team, and Position rank")
+          const data = results.data.slice(1) as PlayerRanking[];
+          setRankings(data.filter((row) => row.Player)); // Filter empty rows
+        },
+      });
+    }
+  };
+
+  const handleDraftUrlSubmit = () => {
+    const match = draftUrl.match(/draft\/nfl\/(\d+)/);
+    if (match) {
+      setDraftId(match[1]);
+      setError('');
+    } else {
+      setError('Invalid Sleeper draft URL');
+    }
+  };
+
+  // Normalize names for matching (e.g., remove Jr., Sr., make lowercase)
+  const normalizeName = (name: string) => name.replace(/ Jr\.| Sr\.| III/g, '').toLowerCase().trim();
+
+  // Get drafted player names (matched to Sleeper full names)
+  const draftedPlayers = picks.map((pick) => {
+    const player = sleeperPlayers[pick.player_id];
+    return player ? normalizeName(player.full_name) : '';
+  });
+
+  // Available players: filter rankings by not drafted, sort by avg projection descending
+  const availablePlayers = rankings
+    .filter((player) => !draftedPlayers.includes(normalizeName(player.Player)))
+    .sort((a, b) => b.avg - a.avg); // Sort by average projection
+
+  // Build team rosters
+  const teamRosters: Record<string, string[]> = {};
+  picks.forEach((pick) => {
+    const user = users.find((u) => u.user_id === pick.picked_by);
+    const teamName = user ? user.display_name : 'Unknown';
+    const player = sleeperPlayers[pick.player_id];
+    const playerName = player ? player.full_name : 'Unknown';
+    if (!teamRosters[teamName]) teamRosters[teamName] = [];
+    teamRosters[teamName].push(playerName);
+  });
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Fantasy Football Draft Assistant</h1>
+
+      {/* CSV Upload */}
+      <div className="mb-4">
+        <label className="block mb-2">Upload Custom Rankings CSV:</label>
+        <input type="file" accept=".csv" onChange={handleCsvUpload} />
+        {rankings.length > 0 && <p>Loaded {rankings.length} players from CSV.</p>}
+      </div>
+
+      {/* Draft URL Input */}
+      <div className="mb-4">
+        <label className="block mb-2">Sleeper Draft URL:</label>
+        <input
+          type="text"
+          value={draftUrl}
+          onChange={(e) => setDraftUrl(e.target.value)}
+          className="border p-2 w-full"
+        />
+        <button onClick={handleDraftUrlSubmit} className="bg-blue-500 text-white p-2 mt-2">
+          Connect to Draft
+        </button>
+        {error && <p className="text-red-500">{error}</p>}
+      </div>
+
+      {draftId && (
+        <>
+          <p className="mb-4">Syncing draft {draftId} every 10 seconds...</p>
+
+          {/* Best Available Players */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-2">Best Available Players (Sorted by Proj Avg)</h2>
+            <table className="w-full border-collapse border">
+              <thead>
+                <tr>
+                  <th className="border p-2">Player</th>
+                  <th className="border p-2">Position</th>
+                  <th className="border p-2">Team</th>
+                  <th className="border p-2">ADP</th>
+                  <th className="border p-2">Proj Avg</th>
+                </tr>
+              </thead>
+              <tbody>
+                {availablePlayers.slice(0, 20).map((player, idx) => ( // Show top 20
+                  <tr key={idx}>
+                    <td className="border p-2">{player.Player}</td>
+                    <td className="border p-2">{player.POS}</td>
+                    <td className="border p-2">{player.Tm}</td>
+                    <td className="border p-2">{player.ADP}</td>
+                    <td className="border p-2">{player.avg}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Draft Board / Recent Picks */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-2">Recent Picks</h2>
+            <ul>
+              {picks.slice(-10).map((pick, idx) => { // Last 10 picks
+                const player = sleeperPlayers[pick.player_id];
+                return (
+                  <li key={idx}>
+                    Pick {pick.pick_no}: {player?.full_name} ({player?.position}) by Team {pick.draft_slot}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {/* Team Rosters */}
+          <div>
+            <h2 className="text-xl font-bold mb-2">Team Rosters</h2>
+            {Object.entries(teamRosters).map(([team, players]) => (
+              <div key={team}>
+                <h3>{team}</h3>
+                <ul>
+                  {players.map((p, idx) => <li key={idx}>{p}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
