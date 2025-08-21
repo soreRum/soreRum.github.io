@@ -53,6 +53,335 @@
         <div class="mt-3 flex items-center gap-2">
           <button id="startBtn" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50">Start Sync</button>
           <button id="stopBtn" class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-semibold disabled:opacity-50" disabled>Stop</button>
-          <span id=
+          <span id="syncStatus" class="text-xs text-slate-600 dark:text-slate-300"></span>
+        </div>
+        <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">The app polls Sleeper every 10 seconds while active.</p>
+      </div>
+    </section>
+
+    <!-- Filters & Search -->
+    <section class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow mb-6">
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="text-sm">Filter positions:</label>
+        <div class="flex gap-2 text-sm">
+          <button data-pos="ALL" class="pos-btn px-3 py-1 rounded-full bg-slate-200 dark:bg-slate-700 dark:text-slate-100">ALL</button>
+          <button data-pos="QB" class="pos-btn px-3 py-1 rounded-full">QB</button>
+          <button data-pos="RB" class="pos-btn px-3 py-1 rounded-full">RB</button>
+          <button data-pos="WR" class="pos-btn px-3 py-1 rounded-full">WR</button>
+          <button data-pos="TE" class="pos-btn px-3 py-1 rounded-full">TE</button>
+          <button data-pos="K"  class="pos-btn px-3 py-1 rounded-full">K</button>
+          <button data-pos="DEF" class="pos-btn px-3 py-1 rounded-full">DEF</button>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <input id="searchInput" type="text" placeholder="Search players..." class="border rounded-xl px-3 py-1 text-sm dark:bg-slate-700 dark:border-slate-600" />
+          <span class="text-xs text-slate-500 dark:text-slate-300" id="counts"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid md:grid-cols-3 gap-4">
+      <div class="md:col-span-2 p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
+        <h3 class="font-semibold mb-2">Best Available (by your rankings)</h3>
+        <div class="overflow-auto">
+          <table class="min-w-full text-sm" id="availableTable">
+            <thead class="sticky top-0 bg-slate-100 dark:bg-slate-700">
+              <tr>
+                <th class="text-left p-2">#</th>
+                <th class="text-left p-2">Player</th>
+                <th class="text-left p-2">POS</th>
+                <th class="text-left p-2">ADP</th>
+                <th class="text-left p-2">Team Offense</th>
+                <th class="text-left p-2">O-Line Grade</th>
+              </tr>
+            </thead>
+            <tbody id="availableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
+        <h3 class="font-semibold mb-2">Live Picks</h3>
+        <ol id="picksList" class="text-sm list-decimal pl-5 space-y-1"></ol>
+      </div>
+    </section>
+
+    <footer class="text-xs text-slate-500 dark:text-slate-300 mt-8">Open-source prototype. Sleeper API © their owners. Not affiliated with Sleeper.</footer>
+  </div>
+
+  <script>
+    // ====== State ======
+    let rawRankings = [];           // Raw rows from CSV
+    let rankings = [];              // { rank, name, pos, adp, teamOffense, olineGrade, player_id? }
+    let playersById = {};           // Sleeper players map: id -> player object
+    const nameToId = new Map();     // "First Last" normalized -> player_id
+    const draftedIds = new Set();   // drafted player_ids
+    let timer = null;
+    let currentPosFilter = 'ALL';
+
+    // ====== Theme toggle ======
+    const themeToggle = document.getElementById('themeToggle');
+    function setTheme(dark) {
+      document.documentElement.classList.toggle('dark', dark);
+      themeToggle.textContent = dark ? '☀️ Light Mode' : '🌙 Dark Mode';
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+    }
+    themeToggle.addEventListener('click', () => setTheme(!document.documentElement.classList.contains('dark')));
+    // Initialize button label
+    setTheme(document.documentElement.classList.contains('dark'));
+
+    // ====== Utilities ======
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    function normName(s) {
+      if (!s) return '';
+      return String(s)
+        .toLowerCase()
+        .replace(/\./g, '')
+        .replace(/\s+jr$/,'')
+        .replace(/\s+sr$/,'')
+        .replace(/[^a-z\s'-]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function extractDraftId(input) {
+      if (!input) return null;
+      const idMatch = String(input).match(/(\d{10,})/);
+      return idMatch ? idMatch[1] : null;
+    }
+
+    function setSyncStatus(msg) {
+      document.getElementById('syncStatus').textContent = msg || '';
+    }
+
+    function setCounts() {
+      const available = getFilteredAvailable();
+      const total = rankings.length;
+      document.getElementById('counts').textContent = `${available.length} available / ${total} total`;
+    }
+
+    // ====== CSV Handling ======
+    const uploadStatus = document.getElementById('uploadStatus');
+    document.getElementById('csvFile').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      uploadStatus.textContent = 'Parsing CSV...';
+
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (res) => {
+          try {
+            const rows = res.data;
+            if (!rows || !rows.length) throw new Error('No rows found');
+
+            // Detect sheet pattern where first data row actually contains headers
+            const firstHeader = Object.keys(rows[0])[0];
+            if (firstHeader && firstHeader.toLowerCase().includes('player') && firstHeader.includes('Age')) {
+              // Reconstruct columns from the first row
+              const headerRow = rows[0];
+              const newCols = Object.values(headerRow);
+
+              Papa.parse(file, {
+                header: false,
+                skipEmptyLines: true,
+                complete: (res2) => {
+                  const raw = res2.data;
+                  const cleaned = raw.slice(1).map((r) => {
+                    const obj = {};
+                    newCols.forEach((c, i) => { obj[c] = r[i]; });
+                    return obj;
+                  });
+                  normalizeRankings(cleaned);
+                },
+              });
+            } else {
+              normalizeRankings(rows);
+            }
+          } catch (err) {
+            console.error(err);
+            uploadStatus.textContent = 'Failed to parse CSV: ' + err.message;
+          }
+        },
+      });
+    });
+
+    function pickKey(obj, candidates) {
+      for (const c of candidates) {
+        for (const k of Object.keys(obj)) {
+          if (String(k).trim().toLowerCase() === c.trim().toLowerCase()) return k;
+        }
+      }
+      return null;
+    }
+
+    function normalizeRankings(rows) {
+      rawRankings = rows;
+
+      // Try to locate plausible columns (case-insensitive)
+      const sample = rows[0] || {};
+      const nameKey = pickKey(sample, ['player','name']) || Object.keys(sample)[0];
+      const posKey  = pickKey(sample, ['pos','position']);
+      const adpKey  = pickKey(sample, ['adp','rank','ecr']);
+      // Your sheet variants for grades:
+      const teamOffKeys = ['team offense','offense grade','team off','team']; // last fallback "team"
+      const olineKeys   = ['o-line grade','oline grade','ol grade','o','ol','offensive line'];
+
+      const teamOffKey = pickKey(sample, teamOffKeys) || null;
+      const olineKey   = pickKey(sample, olineKeys) || null;
+
+      rankings = rows
+        .map((r, idx) => {
+          const name = (r[nameKey] ?? '').toString().trim();
+          const pos  = (posKey ? r[posKey] : '').toString().trim().toUpperCase();
+          const adp  = adpKey ? (r[adpKey] ?? '').toString().trim() : '';
+          const teamOffense = teamOffKey ? (r[teamOffKey] ?? '').toString().trim() : '';
+          const olineGrade  = olineKey ? (r[olineKey] ?? '').toString().trim() : '';
+          return { rank: idx + 1, name, pos, adp, teamOffense, olineGrade, player_id: null };
+        })
+        .filter(r => r.name);
+
+      uploadStatus.innerHTML = `<span class="text-emerald-700 dark:text-emerald-400 font-medium">Loaded ${rankings.length} players.</span>`;
+      renderAvailable();
+      setCounts();
+    }
+
+    // ====== Sleeper API ======
+    async function loadPlayersMap() {
+      if (Object.keys(playersById).length) return; // already loaded
+      setSyncStatus('Loading Sleeper players map...');
+      const url = 'https://api.sleeper.app/v1/players/nfl';
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch Sleeper players map');
+      playersById = await res.json();
+
+      // Build name -> id map (use full_name if present, else first/last)
+      nameToId.clear();
+      for (const [pid, p] of Object.entries(playersById)) {
+        const full = p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
+        const nn = normName(full);
+        if (nn) nameToId.set(nn, pid);
+      }
+      setSyncStatus('Players map loaded.');
+
+      // Attach player_id to our rankings where possible
+      for (const r of rankings) {
+        const id = nameToId.get(normName(r.name));
+        if (id) r.player_id = id;
+      }
+      renderAvailable();
+      setCounts();
+    }
+
+    async function fetchPicks(draftId) {
+      const url = `https://api.sleeper.app/v1/draft/${draftId}/picks`;
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (!res.ok) throw new Error('Failed to fetch picks');
+      return res.json();
+    }
+
+    async function poll(draftId) {
+      try {
+        await loadPlayersMap();
+
+        const picks = await fetchPicks(draftId);
+        draftedIds.clear();
+        const picksList = document.getElementById('picksList');
+        picksList.innerHTML = '';
+
+        picks.forEach((p) => {
+          const pid = p.player_id || (p.metadata && p.metadata.player_id);
+          if (pid) draftedIds.add(String(pid));
+
+          const pl = pid ? (playersById[String(pid)] || {}) : {};
+          const fullName = pl.full_name || [pl.first_name, pl.last_name].filter(Boolean).join(' ').trim();
+          const who = fullName || (p.metadata ? `${p.metadata.first_name || ''} ${p.metadata.last_name || ''}`.trim() : 'Unknown');
+          const li = document.createElement('li');
+          li.textContent = `${who || 'Unknown'}${p.metadata && p.metadata.team ? ' (' + p.metadata.team + ')' : ''}`;
+          picksList.appendChild(li);
+        });
+
+        renderAvailable();
+        setCounts();
+        setSyncStatus(`Last updated: ${new Date().toLocaleTimeString()}`);
+      } catch (e) {
+        console.error(e);
+        setSyncStatus('Sync error: ' + e.message);
+      }
+    }
+
+    // ====== Rendering ======
+    function getFilteredAvailable() {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      return rankings.filter(r => {
+        const notDrafted = !r.player_id || !draftedIds.has(String(r.player_id));
+        const posOk = currentPosFilter === 'ALL' || (r.pos || '').toUpperCase() === currentPosFilter;
+        const qOk = !q || r.name.toLowerCase().includes(q);
+        return notDrafted && posOk && qOk;
+      });
+    }
+
+    function renderAvailable() {
+      const tbody = document.getElementById('availableBody');
+      tbody.innerHTML = '';
+      const rows = getFilteredAvailable().slice(0, 300); // safety cap for rendering
+      for (const r of rows) {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b last:border-0 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors';
+        tr.innerHTML = `
+          <td class="p-2 text-slate-500 dark:text-slate-300">${r.rank}</td>
+          <td class="p-2 font-medium">${r.name}</td>
+          <td class="p-2">${r.pos || ''}</td>
+          <td class="p-2">${r.adp || ''}</td>
+          <td class="p-2">${r.teamOffense || ''}</td>
+          <td class="p-2">${r.olineGrade || ''}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // ====== UI Events ======
+    document.querySelectorAll('.pos-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('bg-slate-900','text-white','bg-slate-200','dark:bg-slate-700','dark:text-slate-100'));
+        document.querySelectorAll('.pos-btn').forEach(b => b.classList.add('bg-slate-200','dark:bg-slate-700','dark:text-slate-100'));
+        btn.classList.remove('bg-slate-200','dark:bg-slate-700','dark:text-slate-100');
+        btn.classList.add('bg-slate-900','text-white');
+        currentPosFilter = btn.dataset.pos;
+        renderAvailable();
+        setCounts();
+      });
+    });
+
+    document.getElementById('searchInput').addEventListener('input', () => {
+      renderAvailable();
+      setCounts();
+    });
+
+    document.getElementById('startBtn').addEventListener('click', async () => {
+      const draftInput = document.getElementById('draftInput').value.trim();
+      const draftId = extractDraftId(draftInput);
+      if (!draftId) {
+        alert('Please paste a valid Sleeper draft URL or numeric draft ID.');
+        return;
+      }
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
+      setSyncStatus('Starting...');
+
+      await poll(draftId);
+      timer = setInterval(() => poll(draftId), 10_000);
+    });
+
+    document.getElementById('stopBtn').addEventListener('click', () => {
+      if (timer) clearInterval(timer);
+      setSyncStatus('Stopped');
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      timer = null;
+    });
+  </script>
+</body>
+</html>
 
 
