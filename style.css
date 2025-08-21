@@ -1,4 +1,0 @@
-/* Smooth color transitions for dark mode */
-body {
-  transition: background-color 0.2s, color 0.2s;
-}
