@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sleeper Draft Sync + Custom Rankings</title>
+  <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { darkMode: 'class' };
@@ -26,14 +27,18 @@
           <p class="text-sm text-slate-600 dark:text-slate-400">Upload your own CSV rankings, paste a Sleeper draft URL or ID, and auto-sync every 10s during live drafts.</p>
         </div>
       </div>
-      <button id="themeToggle" class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-semibold">🌙 Dark Mode</button>
+      <button id="themeToggle" class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-semibold">
+        🌙 Dark Mode
+      </button>
     </header>
 
     <section class="grid md:grid-cols-2 gap-4 mb-6">
       <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
         <h2 class="font-semibold mb-2">1) Upload your rankings (.csv)</h2>
         <input id="csvFile" type="file" accept=".csv" class="block w-full text-sm" />
-        <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">Tip: Your file can be in any column layout as long as it includes a <span class="font-medium">player name</span> column. If your sheet's first data row contains headers (e.g., "Player, Age, Tm, POS..."), this app will auto-detect and clean it.</p>
+        <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">
+          Tip: Your file can be in any column layout as long as it includes a <span class="font-medium">player name</span> column.
+        </p>
         <div id="uploadStatus" class="mt-2 text-sm"></div>
       </div>
       <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
@@ -67,21 +72,6 @@
       </div>
     </section>
 
-    <!-- My Roster Section -->
-    <section class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow mb-6">
-      <h3 class="font-semibold mb-2">My Roster</h3>
-      <div id="myRoster" class="grid grid-cols-2 gap-2 text-sm">
-        <div><strong>QB:</strong> <span id="pos-QB">—</span></div>
-        <div><strong>RB:</strong> <span id="pos-RB">—</span></div>
-        <div><strong>WR:</strong> <span id="pos-WR">—</span></div>
-        <div><strong>TE:</strong> <span id="pos-TE">—</span></div>
-        <div><strong>W/R/T:</strong> <span id="pos-FLEX">—</span></div>
-        <div><strong>K:</strong> <span id="pos-K">—</span></div>
-        <div><strong>DEF:</strong> <span id="pos-DEF">—</span></div>
-        <div><strong>BN:</strong> <span id="pos-BN">—</span></div>
-      </div>
-    </section>
-
     <section class="grid md:grid-cols-3 gap-4">
       <div class="md:col-span-2 p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
         <h3 class="font-semibold mb-2">Best Available (by your rankings)</h3>
@@ -93,8 +83,6 @@
                 <th class="text-left p-2">Player</th>
                 <th class="text-left p-2">POS</th>
                 <th class="text-left p-2">ADP</th>
-                <th class="text-left p-2">Team Offense</th>
-                <th class="text-left p-2">O-Line Grade</th>
               </tr>
             </thead>
             <tbody id="availableBody"></tbody>
@@ -112,8 +100,12 @@
   </div>
 
   <script>
-    let rawRankings = [], rankings = [], playersById = {}, timer = null;
-    const draftedIds = new Set(), nameToId = new Map();
+    let rawRankings = [];
+    let rankings = [];
+    let playersById = {};
+    const nameToId = new Map();
+    const draftedIds = new Set();
+    let timer = null;
     let currentPosFilter = 'ALL';
 
     const themeToggle = document.getElementById('themeToggle');
@@ -125,165 +117,188 @@
     themeToggle.addEventListener('click', () => setTheme(!document.documentElement.classList.contains('dark')));
     setTheme(document.documentElement.classList.contains('dark'));
 
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-    function normName(s) { return String(s||'').toLowerCase().replace(/\./g,'').replace(/\s+jr$/,'').replace(/\s+sr$/,'').replace(/[^a-z\s'-]/g,'').replace(/\s+/g,' ').trim(); }
-    function extractDraftId(input) { const m = String(input).match(/(\d{10,})/); return m?m[1]:null; }
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    function normName(s) { return s?.toString().toLowerCase().replace(/\./g,'').replace(/\s+jr$/,'').replace(/\s+sr$/,'').replace(/[^a-z\s'-]/g,'').replace(/\s+/g,' ').trim()||''; }
+    function extractDraftId(input) { const idMatch = String(input).match(/(\d{10,})/); return idMatch ? idMatch[1] : null; }
     function setSyncStatus(msg) { document.getElementById('syncStatus').textContent = msg || ''; }
-    function setCounts() { const available = getFilteredAvailable(); const total = rankings.length; document.getElementById('counts').textContent = `${available.length} available / ${total} total`; }
+    function setCounts() { const available = getFilteredAvailable(); document.getElementById('counts').textContent = `${available.length} available / ${rankings.length} total`; }
 
-    // ===== CSV Handling =====
-    document.getElementById('csvFile').addEventListener('change', e => {
-      const file = e.target.files?.[0]; if (!file) return; document.getElementById('uploadStatus').textContent = 'Parsing CSV...';
-      Papa.parse(file, { header:true, skipEmptyLines:true, complete: res => {
-        try {
-          const rows = res.data; if (!rows?.length) throw new Error('No rows found');
-          normalizeRankings(rows);
-        } catch(e){ console.error(e); document.getElementById('uploadStatus').textContent = 'Failed to parse CSV: '+e.message; }
-      }});
+    const uploadStatus = document.getElementById('uploadStatus');
+    document.getElementById('csvFile').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      uploadStatus.textContent = 'Parsing CSV...';
+
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (res) => {
+          try {
+            const rows = res.data;
+            if (!rows || !rows.length) throw new Error('No rows found');
+
+            const firstHeader = Object.keys(rows[0])[0];
+            if (firstHeader && firstHeader.toLowerCase().includes('player') && firstHeader.includes('Age')) {
+              const headerRow = rows[0];
+              const newCols = Object.values(headerRow);
+
+              Papa.parse(file, { header: false, skipEmptyLines: true, complete: (res2) => {
+                const raw = res2.data;
+                const cleaned = raw.slice(1).map(r => {
+                  const obj = {};
+                  newCols.forEach((c,i)=>obj[c]=r[i]);
+                  return obj;
+                });
+                normalizeRankings(cleaned);
+              }});
+            } else {
+              normalizeRankings(rows);
+            }
+          } catch (err) { console.error(err); uploadStatus.textContent = 'Failed to parse CSV: ' + err.message; }
+        },
+      });
     });
 
-    function pickKey(obj, candidates){ for(const c of candidates){ for(const k of Object.keys(obj)){ if(String(k).trim().toLowerCase()===c.trim().toLowerCase()) return k; } } return null; }
+    function pickKey(obj, candidates) { for (const c of candidates) { for (const k of Object.keys(obj)) { if (String(k).trim().toLowerCase() === c.trim().toLowerCase()) return k; } } return null; }
 
-    function normalizeRankings(rows){
+    function normalizeRankings(rows) {
       rawRankings = rows;
       const sample = rows[0] || {};
-      const nameKey = pickKey(sample,['player','name'])||Object.keys(sample)[0];
-      const posKey  = pickKey(sample,['pos','position']);
-      const adpKey  = pickKey(sample,['adp','rank','ecr']);
-      const rankingsClean = rows.map((r,idx)=>{
-        const name = (r[nameKey]??'').toString().trim();
-        const pos = (posKey?r[posKey]:'').toString().trim().toUpperCase();
-        const adp = adpKey?(r[adpKey]??'').toString().trim():'';
-        return {rank: idx+1, name, pos, adp, teamOffense:'', olineGrade:'', player_id:null};
-      }).filter(r=>r.name);
-      rankings = rankingsClean;
-      document.getElementById('uploadStatus').innerHTML = `<span class="text-emerald-700 dark:text-emerald-400 font-medium">Loaded ${rankings.length} players.</span>`;
-      renderAvailable(); setCounts();
+      const nameKey = pickKey(sample, ['player','name']) || Object.keys(sample)[0];
+      const posKey  = pickKey(sample, ['pos','position']);
+      const adpKey  = pickKey(sample, ['adp','rank','ecr']);
+
+      rankings = rows
+        .map((r, idx) => {
+          const name = (r[nameKey] ?? '').toString().trim();
+          const pos  = (posKey ? r[posKey] : '').toString().trim().toUpperCase();
+          const adp  = adpKey ? (r[adpKey] ?? '').toString().trim() : '';
+          return { rank: idx + 1, name, pos, adp, player_id: null };
+        })
+        .filter(r => r.name);
+
+      uploadStatus.innerHTML = `<span class="text-emerald-700 dark:text-emerald-400 font-medium">Loaded ${rankings.length} players.</span>`;
+      renderAvailable();
+      setCounts();
     }
 
-    async function loadPlayersMap(){
-      if(Object.keys(playersById).length) return;
+    async function loadPlayersMap() {
+      if (Object.keys(playersById).length) return;
       setSyncStatus('Loading Sleeper players map...');
       const res = await fetch('https://api.sleeper.app/v1/players/nfl');
-      if(!res.ok) throw new Error('Failed to fetch players map');
+      if (!res.ok) throw new Error('Failed to fetch Sleeper players map');
       playersById = await res.json();
+
       nameToId.clear();
-      for(const [pid,p] of Object.entries(playersById)){
-        const full = p.full_name||[p.first_name,p.last_name].filter(Boolean).join(' ').trim();
-        const nn = normName(full); if(nn) nameToId.set(nn,pid);
+      for (const [pid, p] of Object.entries(playersById)) {
+        const full = p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
+        const nn = normName(full);
+        if (nn) nameToId.set(nn, pid);
       }
       setSyncStatus('Players map loaded.');
-      for(const r of rankings){ const id=nameToId.get(normName(r.name)); if(id) r.player_id=id; }
-      renderAvailable(); setCounts();
+
+      for (const r of rankings) {
+        const id = nameToId.get(normName(r.name));
+        if (id) r.player_id = id;
+      }
+      renderAvailable();
+      setCounts();
     }
 
-    async function fetchPicks(draftId){
-      const res = await fetch(`https://api.sleeper.app/v1/draft/${draftId}/picks`,{cache:'no-cache'});
-      if(!res.ok) throw new Error('Failed to fetch picks');
+    async function fetchPicks(draftId) {
+      const res = await fetch(`https://api.sleeper.app/v1/draft/${draftId}/picks`, { cache: 'no-cache' });
+      if (!res.ok) throw new Error('Failed to fetch picks');
       return res.json();
     }
 
-    async function poll(draftId){
-      try{
+    async function poll(draftId) {
+      try {
         await loadPlayersMap();
         const picks = await fetchPicks(draftId);
         draftedIds.clear();
-        const picksList = document.getElementById('picksList'); picksList.innerHTML='';
-        picks.forEach(p=>{
+        const picksList = document.getElementById('picksList');
+        picksList.innerHTML = '';
+
+        picks.forEach((p) => {
           const pid = p.player_id || (p.metadata && p.metadata.player_id);
-          if(pid) draftedIds.add(String(pid));
-          const pl = pid?playersById[String(pid)]||{}:{};
-          const fullName = pl.full_name || [pl.first_name,pl.last_name].filter(Boolean).join(' ').trim();
-          const who = fullName || (p.metadata?`${p.metadata.first_name||''} ${p.metadata.last_name||''}`.trim():'Unknown');
-          const li=document.createElement('li'); li.textContent = `${who}${p.metadata&&p.metadata.team?' ('+p.metadata.team+')':''}`; picksList.appendChild(li);
+          if (pid) draftedIds.add(String(pid));
+          const pl = pid ? (playersById[String(pid)] || {}) : {};
+          const fullName = pl.full_name || [pl.first_name, pl.last_name].filter(Boolean).join(' ').trim();
+          const who = fullName || (p.metadata ? `${p.metadata.first_name || ''} ${p.metadata.last_name || ''}`.trim() : 'Unknown');
+          const li = document.createElement('li');
+          li.textContent = `${who || 'Unknown'}${p.metadata && p.metadata.team ? ' (' + p.metadata.team + ')' : ''}`;
+          picksList.appendChild(li);
         });
-        renderAvailable(); setCounts(); renderMyRoster();
+
+        renderAvailable();
+        setCounts();
         setSyncStatus(`Last updated: ${new Date().toLocaleTimeString()}`);
-      }catch(e){ console.error(e); setSyncStatus('Sync error: '+e.message);}
+      } catch (e) { console.error(e); setSyncStatus('Sync error: ' + e.message); }
     }
 
-    function getFilteredAvailable(){
-      const q=document.getElementById('searchInput').value.trim().toLowerCase();
-      return rankings.filter(r=>{
+    function getFilteredAvailable() {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      return rankings.filter(r => {
         const notDrafted = !r.player_id || !draftedIds.has(String(r.player_id));
-        const posOk = currentPosFilter==='ALL' || (r.pos||'').toUpperCase()===currentPosFilter;
+        const posOk = currentPosFilter === 'ALL' || (r.pos || '').toUpperCase() === currentPosFilter;
         const qOk = !q || r.name.toLowerCase().includes(q);
         return notDrafted && posOk && qOk;
       });
     }
 
-    function renderAvailable(){
-      const tbody = document.getElementById('availableBody'); tbody.innerHTML='';
-      getFilteredAvailable().slice(0,300).forEach(r=>{
-        const tr=document.createElement('tr');
-        tr.className='border-b last:border-0 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors';
-        tr.innerHTML=`<td class="p-2 text-slate-500 dark:text-slate-300">${r.rank}</td>
+    function renderAvailable() {
+      const tbody = document.getElementById('availableBody');
+      tbody.innerHTML = '';
+      const rows = getFilteredAvailable().slice(0, 300);
+      for (const r of rows) {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b last:border-0 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors';
+        tr.innerHTML = `
+          <td class="p-2 text-slate-500 dark:text-slate-300">${r.rank}</td>
           <td class="p-2 font-medium">${r.name}</td>
-          <td class="p-2">${r.pos||''}</td>
-          <td class="p-2">${r.adp||''}</td>
-          <td class="p-2">${r.teamOffense||''}</td>
-          <td class="p-2">${r.olineGrade||''}</td>`;
+          <td class="p-2">${r.pos || ''}</td>
+          <td class="p-2">${r.adp || ''}</td>
+        `;
         tbody.appendChild(tr);
-      });
+      }
     }
 
-    function renderMyRoster(){
-      const posMap={QB:[],RB:[],WR:[],TE:[],FLEX:[],K:[],DEF:[],BN:[]};
-      draftedIds.forEach(pid=>{
-        const r=rankings.find(r=>r.player_id==pid); if(!r) return;
-        const pos=r.pos.toUpperCase();
-        if(pos==='QB') posMap.QB.push(r.name);
-        else if(pos==='RB') posMap.RB.push(r.name);
-        else if(pos==='WR') posMap.WR.push(r.name);
-        else if(pos==='TE') posMap.TE.push(r.name);
-        else if(pos==='K') posMap.K.push(r.name);
-        else if(pos==='DEF') posMap.DEF.push(r.name);
-        else posMap.FLEX.push(r.name);
-      });
-      const startersCount={QB:1,RB:2,WR:2,TE:1,FLEX:2,K:1,DEF:1};
-      Object.keys(posMap).forEach(pos=>{
-        const span=document.getElementById(`pos-${pos}`);
-        if(!span) return;
-        if(pos==='FLEX') span.textContent=posMap.FLEX.slice(0,startersCount.FLEX).join(', ')||'—';
-        else if(pos==='BN'){
-          const bnPlayers=[];
-          ['QB','RB','WR','TE','FLEX','K','DEF'].forEach(p=>{
-            const extra=posMap[p].slice(startersCount[p]||0);
-            bnPlayers.push(...extra);
-          });
-          span.textContent=bnPlayers.join(', ')||'—';
-        }else span.textContent=posMap[pos].slice(0,startersCount[pos]).join(', ')||'—';
-      });
-    }
-
-    document.querySelectorAll('.pos-btn').forEach(btn=>{
-      btn.addEventListener('click',()=>{
-        document.querySelectorAll('.pos-btn').forEach(b=>b.classList.remove('bg-slate-900','text-white','bg-slate-200','dark:bg-slate-700','dark:text-slate-100'));
-        document.querySelectorAll('.pos-btn').forEach(b=>b.classList.add('bg-slate-200','dark:bg-slate-700','dark:text-slate-100'));
+    document.querySelectorAll('.pos-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('bg-slate-900','text-white','bg-slate-200','dark:bg-slate-700','dark:text-slate-100'));
+        document.querySelectorAll('.pos-btn').forEach(b => b.classList.add('bg-slate-200','dark:bg-slate-700','dark:text-slate-100'));
         btn.classList.remove('bg-slate-200','dark:bg-slate-700','dark:text-slate-100');
         btn.classList.add('bg-slate-900','text-white');
-        currentPosFilter=btn.dataset.pos; renderAvailable(); setCounts();
+        currentPosFilter = btn.dataset.pos;
+        renderAvailable();
+        setCounts();
       });
     });
 
-    document.getElementById('searchInput').addEventListener('input',()=>{ renderAvailable(); setCounts(); });
+    document.getElementById('searchInput').addEventListener('input', () => { renderAvailable(); setCounts(); });
 
-    document.getElementById('startBtn').addEventListener('click',async()=>{
-      const draftInput=document.getElementById('draftInput').value.trim();
-      const draftId=extractDraftId(draftInput); if(!draftId){ alert('Please paste a valid Sleeper draft URL or numeric draft ID.'); return; }
-      document.getElementById('startBtn').disabled=true; document.getElementById('stopBtn').disabled=false;
-      setSyncStatus('Starting...'); await poll(draftId);
-      timer=setInterval(()=>poll(draftId),10000);
+    document.getElementById('startBtn').addEventListener('click', async () => {
+      const draftInput = document.getElementById('draftInput').value.trim();
+      const draftId = extractDraftId(draftInput);
+      if (!draftId) { alert('Please paste a valid Sleeper draft URL or numeric draft ID.'); return; }
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
+      setSyncStatus('Starting...');
+      await poll(draftId);
+      timer = setInterval(() => poll(draftId), 10_000);
     });
 
-    document.getElementById('stopBtn').addEventListener('click',()=>{
-      if(timer) clearInterval(timer);
-      setSyncStatus('Stopped'); document.getElementById('startBtn').disabled=false; document.getElementById('stopBtn').disabled=true;
-      timer=null;
+    document.getElementById('stopBtn').addEventListener('click', () => {
+      if (timer) clearInterval(timer);
+      setSyncStatus('Stopped');
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      timer = null;
     });
   </script>
 </body>
 </html>
+
 
 
 
