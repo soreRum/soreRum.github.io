@@ -40,22 +40,6 @@
           Tip: Your file can be in any column layout as long as it includes a <span class="font-medium">player name</span> column.
         </p>
         <div id="uploadStatus" class="mt-2 text-sm"></div>
-
-        <!-- My Team Picks Table -->
-        <div class="mt-4 p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
-          <h3 class="font-semibold mb-2">My Team Picks</h3>
-          <table class="min-w-full text-sm">
-            <thead class="bg-slate-100 dark:bg-slate-700">
-              <tr>
-                <th class="text-left p-2">#</th>
-                <th class="text-left p-2">Player</th>
-                <th class="text-left p-2">POS</th>
-                <th class="text-left p-2">ADP</th>
-              </tr>
-            </thead>
-            <tbody id="myTeamBody"></tbody>
-          </table>
-        </div>
       </div>
 
       <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
@@ -124,7 +108,6 @@
     const draftedIds = new Set();
     let timer = null;
     let currentPosFilter = 'ALL';
-    let myTeamNumber = null; // Will be auto-detected
 
     const themeToggle = document.getElementById('themeToggle');
     function setTheme(dark) {
@@ -146,7 +129,6 @@
       const file = e.target.files?.[0];
       if (!file) return;
       uploadStatus.textContent = 'Parsing CSV...';
-
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
@@ -154,24 +136,7 @@
           try {
             const rows = res.data;
             if (!rows || !rows.length) throw new Error('No rows found');
-
-            const firstHeader = Object.keys(rows[0])[0];
-            if (firstHeader && firstHeader.toLowerCase().includes('player') && firstHeader.includes('Age')) {
-              const headerRow = rows[0];
-              const newCols = Object.values(headerRow);
-
-              Papa.parse(file, { header: false, skipEmptyLines: true, complete: (res2) => {
-                const raw = res2.data;
-                const cleaned = raw.slice(1).map(r => {
-                  const obj = {};
-                  newCols.forEach((c,i)=>obj[c]=r[i]);
-                  return obj;
-                });
-                normalizeRankings(cleaned);
-              }});
-            } else {
-              normalizeRankings(rows);
-            }
+            normalizeRankings(rows);
           } catch (err) { console.error(err); uploadStatus.textContent = 'Failed to parse CSV: ' + err.message; }
         },
       });
@@ -204,7 +169,7 @@
       if (Object.keys(playersById).length) return;
       setSyncStatus('Loading Sleeper players map...');
       const res = await fetch('https://api.sleeper.app/v1/players/nfl');
-      if (!res.ok) throw new Error('Failed to fetch Sleeper players map');
+      if (!res.ok) throw new Error('Failed to fetch players map');
       playersById = await res.json();
 
       nameToId.clear();
@@ -229,51 +194,13 @@
       return res.json();
     }
 
-    // New: Update My Team Picks Table
-    function updateMyTeamTable(picks) {
-      if (!myTeamNumber) return;
-      const tbody = document.getElementById('myTeamBody');
-      tbody.innerHTML = '';
-
-      let count = 1;
-      picks
-        .filter(p => p.draft_slot === myTeamNumber)
-        .forEach(p => {
-          const pid = p.player_id || (p.metadata && p.metadata.player_id);
-          const pl = pid ? (playersById[String(pid)] || {}) : {};
-          const fullName = pl.full_name || [pl.first_name, pl.last_name].filter(Boolean).join(' ').trim();
-          const pos = (pl.position || p.metadata?.position || '').toUpperCase();
-          const adp = rankings.find(r => r.player_id == pid)?.adp || '';
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="p-2 text-slate-500 dark:text-slate-300">${count++}</td>
-            <td class="p-2 font-medium">${fullName}</td>
-            <td class="p-2">${pos}</td>
-            <td class="p-2">${adp}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-    }
-
     async function poll(draftId) {
       try {
         await loadPlayersMap();
         const picks = await fetchPicks(draftId);
         draftedIds.clear();
-
         const picksList = document.getElementById('picksList');
         picksList.innerHTML = '';
-
-        // Auto-detect my team number
-        if (!myTeamNumber && picks.length) {
-          // Assuming first pick that matches a player in your rankings
-          const myPick = picks.find(p => {
-            const pid = p.player_id || (p.metadata && p.metadata.player_id);
-            return pid && rankings.some(r => r.player_id == pid);
-          });
-          if (myPick) myTeamNumber = myPick.draft_slot;
-        }
 
         picks.forEach((p) => {
           const pid = p.player_id || (p.metadata && p.metadata.player_id);
@@ -286,16 +213,10 @@
           picksList.appendChild(li);
         });
 
-        // Update My Team Picks table
-        updateMyTeamTable(picks);
-
         renderAvailable();
         setCounts();
         setSyncStatus(`Last updated: ${new Date().toLocaleTimeString()}`);
-      } catch (e) {
-        console.error(e);
-        setSyncStatus('Sync error: ' + e.message);
-      }
+      } catch (e) { console.error(e); setSyncStatus('Sync error: ' + e.message); }
     }
 
     function getFilteredAvailable() {
@@ -360,6 +281,7 @@
   </script>
 </body>
 </html>
+
 
 
 
