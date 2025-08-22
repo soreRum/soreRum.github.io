@@ -102,6 +102,21 @@
       <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
         <h3 class="font-semibold mb-2">Live Picks</h3>
         <ol id="picksList" class="text-sm list-decimal pl-5 space-y-1"></ol>
+
+        <!-- My Roster Section -->
+        <div class="mt-4 p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
+          <h3 class="font-semibold mb-2">My Roster</h3>
+          <div id="myRoster" class="grid grid-cols-2 gap-2 text-sm">
+            <div><strong>QB:</strong> <span id="pos-QB">—</span></div>
+            <div><strong>RB:</strong> <span id="pos-RB">—</span></div>
+            <div><strong>WR:</strong> <span id="pos-WR">—</span></div>
+            <div><strong>TE:</strong> <span id="pos-TE">—</span></div>
+            <div><strong>W/R/T:</strong> <span id="pos-FLEX">—</span></div>
+            <div><strong>K:</strong> <span id="pos-K">—</span></div>
+            <div><strong>DEF:</strong> <span id="pos-DEF">—</span></div>
+            <div><strong>BN:</strong> <span id="pos-BN">—</span></div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -110,11 +125,11 @@
 
   <script>
     // ====== State ======
-    let rawRankings = [];           // Raw rows from CSV
-    let rankings = [];              // { rank, name, pos, adp, teamOffense, olineGrade, player_id? }
-    let playersById = {};           // Sleeper players map: id -> player object
-    const nameToId = new Map();     // "First Last" normalized -> player_id
-    const draftedIds = new Set();   // drafted player_ids
+    let rawRankings = [];
+    let rankings = [];
+    let playersById = {};
+    const nameToId = new Map();
+    const draftedIds = new Set();
     let timer = null;
     let currentPosFilter = 'ALL';
 
@@ -126,34 +141,20 @@
       localStorage.setItem('theme', dark ? 'dark' : 'light');
     }
     themeToggle.addEventListener('click', () => setTheme(!document.documentElement.classList.contains('dark')));
-    // Initialize button label
     setTheme(document.documentElement.classList.contains('dark'));
 
     // ====== Utilities ======
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
     function normName(s) {
       if (!s) return '';
-      return String(s)
-        .toLowerCase()
-        .replace(/\./g, '')
-        .replace(/\s+jr$/,'')
-        .replace(/\s+sr$/,'')
-        .replace(/[^a-z\s'-]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+      return String(s).toLowerCase().replace(/\./g, '').replace(/\s+jr$/,'').replace(/\s+sr$/,'').replace(/[^a-z\s'-]/g, '').replace(/\s+/g, ' ').trim();
     }
-
     function extractDraftId(input) {
       if (!input) return null;
       const idMatch = String(input).match(/(\d{10,})/);
       return idMatch ? idMatch[1] : null;
     }
-
-    function setSyncStatus(msg) {
-      document.getElementById('syncStatus').textContent = msg || '';
-    }
-
+    function setSyncStatus(msg) { document.getElementById('syncStatus').textContent = msg || ''; }
     function setCounts() {
       const available = getFilteredAvailable();
       const total = rankings.length;
@@ -175,10 +176,8 @@
             const rows = res.data;
             if (!rows || !rows.length) throw new Error('No rows found');
 
-            // Detect sheet pattern where first data row actually contains headers
             const firstHeader = Object.keys(rows[0])[0];
             if (firstHeader && firstHeader.toLowerCase().includes('player') && firstHeader.includes('Age')) {
-              // Reconstruct columns from the first row
               const headerRow = rows[0];
               const newCols = Object.values(headerRow);
 
@@ -195,9 +194,7 @@
                   normalizeRankings(cleaned);
                 },
               });
-            } else {
-              normalizeRankings(rows);
-            }
+            } else { normalizeRankings(rows); }
           } catch (err) {
             console.error(err);
             uploadStatus.textContent = 'Failed to parse CSV: ' + err.message;
@@ -217,16 +214,12 @@
 
     function normalizeRankings(rows) {
       rawRankings = rows;
-
-      // Try to locate plausible columns (case-insensitive)
       const sample = rows[0] || {};
       const nameKey = pickKey(sample, ['player','name']) || Object.keys(sample)[0];
       const posKey  = pickKey(sample, ['pos','position']);
       const adpKey  = pickKey(sample, ['adp','rank','ecr']);
-      // Your sheet variants for grades:
-      const teamOffKeys = ['team offense','offense grade','team off','team']; // last fallback "team"
+      const teamOffKeys = ['team offense','offense grade','team off','team'];
       const olineKeys   = ['o-line grade','oline grade','ol grade','o','ol','offensive line'];
-
       const teamOffKey = pickKey(sample, teamOffKeys) || null;
       const olineKey   = pickKey(sample, olineKeys) || null;
 
@@ -248,14 +241,13 @@
 
     // ====== Sleeper API ======
     async function loadPlayersMap() {
-      if (Object.keys(playersById).length) return; // already loaded
+      if (Object.keys(playersById).length) return;
       setSyncStatus('Loading Sleeper players map...');
       const url = 'https://api.sleeper.app/v1/players/nfl';
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch Sleeper players map');
       playersById = await res.json();
 
-      // Build name -> id map (use full_name if present, else first/last)
       nameToId.clear();
       for (const [pid, p] of Object.entries(playersById)) {
         const full = p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
@@ -264,7 +256,6 @@
       }
       setSyncStatus('Players map loaded.');
 
-      // Attach player_id to our rankings where possible
       for (const r of rankings) {
         const id = nameToId.get(normName(r.name));
         if (id) r.player_id = id;
@@ -283,7 +274,6 @@
     async function poll(draftId) {
       try {
         await loadPlayersMap();
-
         const picks = await fetchPicks(draftId);
         draftedIds.clear();
         const picksList = document.getElementById('picksList');
@@ -292,7 +282,6 @@
         picks.forEach((p) => {
           const pid = p.player_id || (p.metadata && p.metadata.player_id);
           if (pid) draftedIds.add(String(pid));
-
           const pl = pid ? (playersById[String(pid)] || {}) : {};
           const fullName = pl.full_name || [pl.first_name, pl.last_name].filter(Boolean).join(' ').trim();
           const who = fullName || (p.metadata ? `${p.metadata.first_name || ''} ${p.metadata.last_name || ''}`.trim() : 'Unknown');
@@ -303,6 +292,7 @@
 
         renderAvailable();
         setCounts();
+        renderMyRoster(); // <-- NEW FUNCTION CALL
         setSyncStatus(`Last updated: ${new Date().toLocaleTimeString()}`);
       } catch (e) {
         console.error(e);
@@ -324,7 +314,7 @@
     function renderAvailable() {
       const tbody = document.getElementById('availableBody');
       tbody.innerHTML = '';
-      const rows = getFilteredAvailable().slice(0, 300); // safety cap for rendering
+      const rows = getFilteredAvailable().slice(0, 300);
       for (const r of rows) {
         const tr = document.createElement('tr');
         tr.className = 'border-b last:border-0 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors';
@@ -338,6 +328,40 @@
         `;
         tbody.appendChild(tr);
       }
+    }
+
+    // ====== My Roster Rendering ======
+    function renderMyRoster() {
+      const posMap = { QB: [], RB: [], WR: [], TE: [], FLEX: [], K: [], DEF: [], BN: [] };
+      draftedIds.forEach(pid => {
+        const r = rankings.find(r => r.player_id == pid);
+        if (!r) return;
+        const pos = r.pos.toUpperCase();
+        if (pos === 'QB') posMap.QB.push(r.name);
+        else if (pos === 'RB') posMap.RB.push(r.name);
+        else if (pos === 'WR') posMap.WR.push(r.name);
+        else if (pos === 'TE') posMap.TE.push(r.name);
+        else if (pos === 'K') posMap.K.push(r.name);
+        else if (pos === 'DEF') posMap.DEF.push(r.name);
+        else posMap.FLEX.push(r.name);
+      });
+
+      const startersCount = { QB:1, RB:2, WR:2, TE:1, FLEX:2, K:1, DEF:1 };
+      Object.keys(posMap).forEach(pos => {
+        const span = document.getElementById(`pos-${pos}`);
+        if (!span) return;
+        if (pos === 'FLEX') span.textContent = posMap.FLEX.slice(0, startersCount.FLEX).join(', ') || '—';
+        else if (pos === 'BN') {
+          const bnPlayers = [];
+          ['QB','RB','WR','TE','FLEX','K','DEF'].forEach(p => {
+            const extra = posMap[p].slice(startersCount[p] || 0);
+            bnPlayers.push(...extra);
+          });
+          span.textContent = bnPlayers.join(', ') || '—';
+        } else {
+          span.textContent = posMap[pos].slice(0, startersCount[pos]).join(', ') || '—';
+        }
+      });
     }
 
     // ====== UI Events ======
@@ -361,14 +385,10 @@
     document.getElementById('startBtn').addEventListener('click', async () => {
       const draftInput = document.getElementById('draftInput').value.trim();
       const draftId = extractDraftId(draftInput);
-      if (!draftId) {
-        alert('Please paste a valid Sleeper draft URL or numeric draft ID.');
-        return;
-      }
+      if (!draftId) { alert('Please paste a valid Sleeper draft URL or numeric draft ID.'); return; }
       document.getElementById('startBtn').disabled = true;
       document.getElementById('stopBtn').disabled = false;
       setSyncStatus('Starting...');
-
       await poll(draftId);
       timer = setInterval(() => poll(draftId), 10_000);
     });
@@ -383,6 +403,7 @@
   </script>
 </body>
 </html>
+
 
 
 
