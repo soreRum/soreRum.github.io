@@ -41,7 +41,6 @@
         </p>
         <div id="uploadStatus" class="mt-2 text-sm"></div>
       </div>
-
       <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
         <h2 class="font-semibold mb-2">2) Enter Sleeper draft URL or ID</h2>
         <input id="draftInput" type="text" placeholder="e.g., https://sleeper.com/draft/nfl/123456789012345678 or 123456789012345678" class="w-full border rounded-xl px-3 py-2 text-sm dark:bg-slate-700 dark:border-slate-600" />
@@ -129,6 +128,7 @@
       const file = e.target.files?.[0];
       if (!file) return;
       uploadStatus.textContent = 'Parsing CSV...';
+
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
@@ -136,7 +136,24 @@
           try {
             const rows = res.data;
             if (!rows || !rows.length) throw new Error('No rows found');
-            normalizeRankings(rows);
+
+            const firstHeader = Object.keys(rows[0])[0];
+            if (firstHeader && firstHeader.toLowerCase().includes('player') && firstHeader.includes('Age')) {
+              const headerRow = rows[0];
+              const newCols = Object.values(headerRow);
+
+              Papa.parse(file, { header: false, skipEmptyLines: true, complete: (res2) => {
+                const raw = res2.data;
+                const cleaned = raw.slice(1).map(r => {
+                  const obj = {};
+                  newCols.forEach((c,i)=>obj[c]=r[i]);
+                  return obj;
+                });
+                normalizeRankings(cleaned);
+              }});
+            } else {
+              normalizeRankings(rows);
+            }
           } catch (err) { console.error(err); uploadStatus.textContent = 'Failed to parse CSV: ' + err.message; }
         },
       });
@@ -169,7 +186,7 @@
       if (Object.keys(playersById).length) return;
       setSyncStatus('Loading Sleeper players map...');
       const res = await fetch('https://api.sleeper.app/v1/players/nfl');
-      if (!res.ok) throw new Error('Failed to fetch players map');
+      if (!res.ok) throw new Error('Failed to fetch Sleeper players map');
       playersById = await res.json();
 
       nameToId.clear();
@@ -248,11 +265,13 @@
 
     document.querySelectorAll('.pos-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('bg-slate-900','text-white','bg-slate-200','dark:bg-slate-700','dark:text-slate-100'));
-        document.querySelectorAll('.pos-btn').forEach(b => b.classList.add('bg-slate-200','dark:bg-slate-700','dark:text-slate-100'));
+        document.querySelectorAll('.pos-btn').forEach(b => {
+          b.classList.remove('bg-slate-900','text-white');
+          b.classList.add('bg-slate-200','dark:bg-slate-700','dark:text-slate-100');
+        });
         btn.classList.remove('bg-slate-200','dark:bg-slate-700','dark:text-slate-100');
         btn.classList.add('bg-slate-900','text-white');
-        currentPosFilter = btn.dataset.pos;
+        currentPosFilter = btn.dataset.pos.toUpperCase(); // fixed
         renderAvailable();
         setCounts();
       });
