@@ -72,7 +72,7 @@
       </div>
     </section>
 
-    <section class="grid md:grid-cols-3 gap-4">
+    <section class="grid md:grid-cols-3 gap-4 mb-6">
       <div class="md:col-span-2 p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
         <h3 class="font-semibold mb-2">Best Available (by your rankings)</h3>
         <div class="overflow-auto">
@@ -93,6 +93,45 @@
       <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow">
         <h3 class="font-semibold mb-2">Live Picks</h3>
         <ol id="picksList" class="text-sm list-decimal pl-5 space-y-1"></ol>
+      </div>
+    </section>
+
+    <!-- Drafted Team Section -->
+    <section class="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow mb-6">
+      <h3 class="font-semibold mb-2">My Drafted Team</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+        <div>
+          <h4 class="font-medium">QB</h4>
+          <div id="slot-QB" class="p-2 border rounded-md min-h-[32px]"></div>
+        </div>
+        <div>
+          <h4 class="font-medium">TE</h4>
+          <div id="slot-TE" class="p-2 border rounded-md min-h-[32px]"></div>
+        </div>
+        <div>
+          <h4 class="font-medium">RB</h4>
+          <div id="slot-RB" class="p-2 border rounded-md min-h-[32px]"></div>
+        </div>
+        <div>
+          <h4 class="font-medium">WR</h4>
+          <div id="slot-WR" class="p-2 border rounded-md min-h-[32px]"></div>
+        </div>
+        <div>
+          <h4 class="font-medium">W/T/R</h4>
+          <div id="slot-FLEX" class="p-2 border rounded-md min-h-[32px]"></div>
+        </div>
+        <div>
+          <h4 class="font-medium">K</h4>
+          <div id="slot-K" class="p-2 border rounded-md min-h-[32px]"></div>
+        </div>
+        <div>
+          <h4 class="font-medium">DEF</h4>
+          <div id="slot-DEF" class="p-2 border rounded-md min-h-[32px]"></div>
+        </div>
+        <div class="sm:col-span-2">
+          <h4 class="font-medium">Bench</h4>
+          <div id="slot-BN" class="p-2 border rounded-md min-h-[32px] grid grid-cols-1 gap-1"></div>
+        </div>
       </div>
     </section>
 
@@ -211,6 +250,38 @@
       return res.json();
     }
 
+    function updateDraftedTeam(picks) {
+      ['QB','TE','RB','WR','FLEX','K','DEF','BN'].forEach(pos => {
+        document.getElementById('slot-' + pos).innerHTML = '';
+      });
+
+      const counts = { QB:0, TE:0, RB:0, WR:0, FLEX:0, K:0, DEF:0, BN:0 };
+
+      picks.forEach(p => {
+        const pid = p.player_id || (p.metadata && p.metadata.player_id);
+        if (!pid) return;
+        const pl = pid ? (playersById[String(pid)] || {}) : {};
+        const fullName = pl.full_name || [pl.first_name, pl.last_name].filter(Boolean).join(' ').trim();
+        const pos = (pl.position || p.metadata?.position || '').toUpperCase();
+
+        let slotId;
+        if (pos === 'QB' && counts.QB < 1) { slotId = 'QB'; counts.QB++; }
+        else if (pos === 'TE' && counts.TE < 1) { slotId = 'TE'; counts.TE++; }
+        else if (pos === 'RB' && counts.RB < 2) { slotId = 'RB'; counts.RB++; }
+        else if (pos === 'WR' && counts.WR < 2) { slotId = 'WR'; counts.WR++; }
+        else if ((pos === 'WR' || pos === 'RB' || pos === 'TE') && counts.FLEX < 2) { slotId = 'FLEX'; counts.FLEX++; }
+        else if (pos === 'K' && counts.K < 1) { slotId = 'K'; counts.K++; }
+        else if (pos === 'DEF' && counts.DEF < 1) { slotId = 'DEF'; counts.DEF++; }
+        else { slotId = 'BN'; counts.BN++; }
+
+        if (slotId) {
+          const div = document.createElement('div');
+          div.textContent = `${fullName} (${pos})`;
+          document.getElementById('slot-' + slotId).appendChild(div);
+        }
+      });
+    }
+
     async function poll(draftId) {
       try {
         await loadPlayersMap();
@@ -230,6 +301,7 @@
           picksList.appendChild(li);
         });
 
+        updateDraftedTeam(picks);
         renderAvailable();
         setCounts();
         setSyncStatus(`Last updated: ${new Date().toLocaleTimeString()}`);
@@ -298,6 +370,7 @@
   </script>
 </body>
 </html>
+
 
 
 
