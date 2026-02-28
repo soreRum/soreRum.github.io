@@ -8,4 +8,4 @@ rule: `alert tls any any -> any any (msg:"Detected Telegram API connection Activ
 It’s as simple as targeting tls.sni, the Server Name Indication. I originally included the JA3 hash, but realized that it wasn’t helpful for detecting Telegram connection activity. JA3 fingerprints the client TLS handshake, not the destination (api.telegram.org). Adding a JA3 hash for detection would focus on the TLS client implementation rather than Telegram API traffic itself. JA3 is more useful when detecting malware or unusual client behavior, where the TLS fingerprint is unique enough to, a higher success rate at identifying a malicious tool or endpoint.
 
 - ja3 == destination-independant
-- SNi == more direct and reliable indicator 
+- SNI == more direct and reliable indicator 
