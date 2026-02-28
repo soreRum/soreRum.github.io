@@ -13,7 +13,6 @@ The chal expected detection of 12 packets/alerts matching the target:
 ![telegram_rule](./images/telegram_rule.png)
 
 
-
 ## suricata chal: Identify Speech Recognition Chrome Extension Payload in Network Traffic
 - **goal:** Analyze the captured traffic and determine whether a Chrome extension payload is being transferred. Focus on response content that reveals the extension’s manifest and embedded DLL components, and write a Suricata rule that detects this artifact reliably without relying on IPs or ports.
 
@@ -53,4 +52,5 @@ What am I going to target in this rule? the **http.response_header** and file.da
 - 
 The chal expected detection of 1 packet/alert matching the target:
 
+![telegram_rule](./images/chrome_extension_transfer.png)
 
