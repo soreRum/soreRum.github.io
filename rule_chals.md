@@ -42,3 +42,8 @@ PK..........hT...,....H.).+...Microsoft.CognitiveServices.Speech.core.dll.]wxT..
 
 So with all this http stream data collected, Im going to assume this is a microsoft-signed CDN delivery of a browser extension package hinting to be the chrome speech recognition exetension payload being transferred in chunks via BITS.(Background Intelligent Transfer Service). I picked this up from the user-agent btw: `User-Agent: Microsoft BITS/7.8`
 
+Part 1 of the goal was confirmed -> "Analyze the captured traffic and determine whether a Chrome extension payload is being transferred."
+Part 2 of the goal is now to -> "write a Suricata rule that detects this artifact reliably"
+
+
+
