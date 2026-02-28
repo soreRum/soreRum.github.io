@@ -52,5 +52,5 @@ What am I going to target in this rule? the **http.response_header** and file.da
 - 
 The chal expected detection of 1 packet/alert matching the target:
 
-![telegram_rule](./images/chrome_extension_transfer.png)
+![telegram_rule](./images/chrome_extension.png)
 
