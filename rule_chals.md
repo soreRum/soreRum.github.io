@@ -8,7 +8,7 @@
 - ja3 == destination-independant
 - SNI == more direct and reliable indicator
 
-The chal expected detection of 12 packets:
+The chal expected detection of 12 packets/alerts matching the target:
 
 ![telegram_rule](./images/telegram_rule.png)
 
@@ -17,7 +17,7 @@ The chal expected detection of 12 packets:
 ## suricata chal: Identify Speech Recognition Chrome Extension Payload in Network Traffic
 - **goal:** Analyze the captured traffic and determine whether a Chrome extension payload is being transferred. Focus on response content that reveals the extension’s manifest and embedded DLL components, and write a Suricata rule that detects this artifact reliably without relying on IPs or ports.
 
-- **rule:** '------'
+- **rule:** 'alert http any any -> any any (msg:"Speech Recognition Chrome Extension Payload in Network Traffic --- Identified"; flow:established,to_client; http.response_header; content:"application/x-chrome-extension"; file.data; content:"Speech Recognition"; content:"\"manifest_version\": 2"; content:"\"name\": \"Speech Recognition\""; content:"Microsoft.CognitiveServices.Speech.core.dll"; sid:100001; rev:1;)'
 
 **Thoughts:** I wanted to build context before creating this rule. I followed the HTTP/TCP stream and found a stream where some bits of the manifest.json file showed up within the transferred bytes, including the string "name": "Speech Recognition". The host string (`msedge.b.tlu.dl.delivery.mp.microsoft.com`) appears to be a Microsoft Edge CDN endpoint, specifically a download delivery mechanism for Microsoft-specific content such as extensions or update packages. Here is the full request example I am analyzing:
 
@@ -50,3 +50,7 @@ What am I going to target in this rule? the **http.response_header** and file.da
 - `"name": "Speech Recognition"` 
 - `Microsoft.CognitiveServices.Speech.core.dll` 
 - the version is not appropiate here because when the extension version changes, this rule goes down the toilet.
+- 
+The chal expected detection of 1 packet/alert matching the target:
+
+
