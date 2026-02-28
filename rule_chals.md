@@ -49,7 +49,7 @@ What am I going to target in this rule? the **http.response_header** and file.da
 - `"name": "Speech Recognition"` 
 - `Microsoft.CognitiveServices.Speech.core.dll` 
 - the version is not appropiate here because when the extension version changes, this rule goes down the toilet.
-- 
+  
 The chal expected detection of 1 packet/alert matching the target:
 
 ![telegram_rule](./images/chrome_extension.png)
