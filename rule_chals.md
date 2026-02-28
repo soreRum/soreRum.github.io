@@ -1,6 +1,4 @@
-### detectionstream suricata/sigma rule chal
-
-**suricata chal:** Detect Telegram API connection Activity
+## suricata chal: Detect Telegram API connection Activity
 - **goal:** Create a rule that will detect the packets related to the telegram API communication.
 
 **rule:** `alert tls any any -> any any (msg:"Detected Telegram API connection Activity -- via Client Hello"; flow:to_server; tls.sni; content:"api.telegram.org"; nocase; sid:100001; rev:1;)`
@@ -16,7 +14,7 @@ The chal expected detection of 12 packets:
 
 
 
-**suricata chal:** Identify Speech Recognition Chrome Extension Payload in Network Traffic
+## suricata chal: Identify Speech Recognition Chrome Extension Payload in Network Traffic
 - **goal:** Analyze the captured traffic and determine whether a Chrome extension payload is being transferred. Focus on response content that reveals the extension’s manifest and embedded DLL components, and write a Suricata rule that detects this artifact reliably without relying on IPs or ports.
 
 - **rule:** '------'
