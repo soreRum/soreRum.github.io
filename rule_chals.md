@@ -25,7 +25,7 @@ The chal expected detection of 12 packets:
 
 `GET /filestreamingservice/files/2132f61f-f790-4ae6-a355-8cf9a1533800?P1=1757185982&P2=404&P3=2&P4=c1pT928%2fcNpn%2bhiPV%2feDJwgcmMghYDFStIXCZMBx0quHbu8wHa63x0JtAf%2fkqoVZhaG0phaVZr5%2fmgTnCtpSRw%3d%3d HTTP/1.1`
 
-filestreamingservice appears to be a backend service route, files the resource type, and 2132f61f-f790-4ae6-a355-8cf9a1533800 likely a file identifier understood by the backend (the extension payload itself?). The query parameters (P1–P4) appears to be part of a tokenized or crypto signed download request, since P4 looks to be a base-64 encoded sig component. 
+**filestreamingservice** appears to be a backend service route, **files** the resource type, and **2132f61f-f790-4ae6-a355-8cf9a1533800** likely a file identifier understood by the backend (the extension payload itself?). The query parameters (P1–P4) appears to be part of a tokenized or crypto signed download request, since P4 looks to be a base-64 encoded sig component. 
 
 The HTTP response content type is `application/x-chrome-extension`, and the transfer uses a byte range request:
 
