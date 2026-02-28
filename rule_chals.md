@@ -43,7 +43,7 @@ So with all this http stream data collected, Im going to assume this is a micros
 Part 1 of the goal was confirmed -> "Analyze the captured traffic and determine whether a Chrome extension payload is being transferred."
 Part 2 of the goal is now to -> "write a Suricata rule that detects this artifact reliably"
 
-What am I going to target in this rule? the http.response_header and file.data aka the http.response_body
+What am I going to target in this rule? the **http.response_header** and file.data aka the **http.response_body**
 - `Content-Type: "application/x-chrome-extension"` 
 - `"manifest.json"`
 - `"manifest_version": 2` 
