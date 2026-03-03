@@ -54,3 +54,32 @@ The chal expected detection of 1 packet/alert matching the target:
 
 ![telegram_rule](./images/chrome_extension.png)
 
+## suricata chal: Detect SectopRAT C2 Beacon
+- **goal:** The PCAP includes recurring outbound requests from an infected host that follow a consistent structure. Each request uses a distinctive path and includes a parameter with a uniquely formatted value. Your task is to analyze this pattern and write a detection rule based solely on the request structure, focusing on the path and parameter format rather than on any network indicators alone, such as IP and port.
+
+**rule:** `alert http any any -> any any (msg:"SectopRAT C2 Beacon - /wbinjget q=32hex"; flow:to_server,established; http.method; content:"GET"; nocase; http.uri; pcre:"/\/wbinjget\?q=[A-Fa-f0-9]{32}(?:&|$)/U"; classtype:trojan-activity; sid:100001; rev:1;)`
+
+**Thoughts:**  
+`vishneviyjazz.ru `
+pcap ip:**185.95.159.55** -- tied to tls comms -- encrypted
+	- dns check on the A record. no resolves
+	- domain non-existent
+
+`desk-app-now.com` - this one resolves but under a new ip address -> 15.197.240.20 and the domain lookup shows NS1.VERIFICATION-HOLD.SUSPENDED-DOMAIN.COM
+NS2.VERIFICATION-HOLD.SUSPENDED-DOMAIN.COM and was created on may 2025, seems very generic
+pcap ip: **104.21.24.30** and **172.67.216.128** - doesnt show up anywhere else other than dns A record query
+
+
+misc: **5.10.250.239** -- tied to http comms with visible get requests
+- with this ip, there is a tcp three handshake -- success
+- then a http get request on the request uri: /wmglb on port 9000
+- then a little later, another get request but with a  different uri path and new query: `/wbinjget?q=F3175C7E064B74698D8F67EDF4A4FEAA` with a 200 OK response
+	- about 33 more of this same request to -> `/wbinjget?q=F3175C7E064B74698D8F67EDF4A4FEAA` with a 200 OK response for each req. 
+
+client: `10.8.15.176 <http> 5.10.250.239`
+
+We need to lock in onto the path, the request type of course, the param format which loks to be a 32 hex style token so thats where pcre using regex comes in. We dont want to hardcode in on this specific 32 hex token because that can change. so focus on the format. the pcre regex will match on the match on this -> `/wbinjget?q=` and also match exactly 32 hex characters and makes sure the next char is either & or the end of the URI
+
+The chal expected detection of 34 packets/alerts matching the target:
+
+![telegram_rule](./images/rat_rule.png)
