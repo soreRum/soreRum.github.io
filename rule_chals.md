@@ -57,7 +57,7 @@ The chal expected detection of 1 packet/alert matching the target:
 ## suricata chal: Detect SectopRAT C2 Beacon
 - **goal:** The PCAP includes recurring outbound requests from an infected host that follow a consistent structure. Each request uses a distinctive path and includes a parameter with a uniquely formatted value. Your task is to analyze this pattern and write a detection rule based solely on the request structure, focusing on the path and parameter format rather than on any network indicators alone, such as IP and port.
 
-**rule:** `alert http any any -> any any (msg:"SectopRAT C2 Beacon - /wbinjget q=32hex"; flow:to_server,established; http.method; content:"GET";  nocase; http.uri; pcre:"/\/wbinjget\?q=[A-Fa-f0-9]{32}(?:&|$)/U"; classtype:trojan-activity; sid:100001; rev:1;)`
+**rule:** `alert http any any -> any any (msg:"SectopRAT C2 Beacon"; flow:to_server,established; http.method; content:"GET"; http.uri; pcre:"/\/wbinjget\?q=[A-Fa-f0-9]{32}(?:&|$)/U"; classtype:trojan-activity; sid:100001; rev:1;)`
 
 **Thoughts:**  
 `vishneviyjazz.ru `
