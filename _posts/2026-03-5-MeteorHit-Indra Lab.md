@@ -23,3 +23,5 @@ The KAPE artifcat structure shows filesystem artifacts (filesystem triage collec
 
 a copy of policy files, a comp to retrieve those files and a comp that executes the policy settings/scripts?
 
+
+
