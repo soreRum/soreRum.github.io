@@ -1,0 +1,9 @@
+title: gabem thoughts
+description: Mini writeups live here.
+
+markdown: kramdown
+theme: null
+
+collections:
+  posts:
+    output: true
