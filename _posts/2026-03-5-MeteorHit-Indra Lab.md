@@ -19,6 +19,7 @@ about the abuse
 
 about GPO: GPOs have access controls associated  with them and are centrally managed in Active Directory. They are used  to manage security and operational settings across domain systems. GPOs  can handle settings such as: password and account lockout policies, security configurations such as firewall rules and audit policies, software deployment and updates, desktop and user environment restrictions, logon and logoff scripts, system and application configuration settings
 
-detection: monitor when a GPO is changed, what was modified and confirm whether the underlying policy files were accessed
+The KAPE artifcat structure shows filesystem artifacts (filesystem triage collection) pulled from the root of C: so this drive structure was reconstructed. The Security logs for this machine didnt contain events 5136/37 event codes so I assuming that this is a regular user machine who recieves GPOs from a centrally managed domain controller, the machine cannot generate them, the audit policy wasnt enabled, or the artifact collection didnt include the relevant logs. When the centrally managed machine applies a GPO for this machine, what artifacts within this C:/ drive exist locally for it to execute?
 
-- event id 5136 and 5137 - creation/mod of a GPO, 5136 aslo provides what part of the GPO config was altered, event 5145 -- sysvol access to confirm file-level interaction with the policy storage location, timing and context to check whether changes occurred outside normal maintenance windows or performed by unusual accounts
+a copy of policy files, a comp to retrieve those files and a comp that executes the policy settings/scripts?
+
