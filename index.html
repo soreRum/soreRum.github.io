@@ -8,22 +8,44 @@
 <title>gabem thoughts</title>
 
 <style>
+
 body {
-    background:#000;
-    color:#e6e6e6;
-    font-family:monospace;
-    max-width:800px;
-    margin:auto;
-    padding:40px;
+    background: #000;
+    color: #00ff9c;
+    font-family: monospace;
+    max-width: 800px;
+    margin: auto;
+    padding: 40px;
+    line-height: 1.6;
 }
 
-h1 { color:#00ff9c; }
+a {
+    color: #4da6ff;
+    text-decoration: none;
+}
 
-a { color:#4da6ff; text-decoration:none; }
+a:hover {
+    text-decoration: underline;
+}
 
-a:hover { text-decoration:underline; }
+.terminal {
+    background: #0a0a0a;
+    border: 1px solid #333;
+    padding: 20px;
+    margin-bottom: 40px;
+}
 
-.post { margin-bottom:15px; }
+.prompt {
+    color: #00ff9c;
+}
+
+.command {
+    color: #ffffff;
+}
+
+.post {
+    margin-left: 20px;
+}
 
 </style>
 </head>
@@ -34,15 +56,21 @@ a:hover { text-decoration:underline; }
 
 <p>Mini writeups live here.</p>
 
-<h2>Posts</h2>
+<div class="terminal">
+
+<span class="prompt">gabem@lab:~$</span> <span class="command">ls posts</span>
+
+<br><br>
 
 {% for post in site.posts %}
 
 <div class="post">
-<a href="{{ post.url }}"><strong>{{ post.title }}</strong></a>
+<a href="{{ post.url }}">{{ post.title }}</a>
 </div>
 
 {% endfor %}
+
+</div>
 
 <h2>About</h2>
 
