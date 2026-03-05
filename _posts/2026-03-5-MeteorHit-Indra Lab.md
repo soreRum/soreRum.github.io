@@ -19,9 +19,23 @@ about the abuse
 
 about GPO: GPOs have access controls associated  with them and are centrally managed in Active Directory. They are used  to manage security and operational settings across domain systems. GPOs  can handle settings such as: password and account lockout policies, security configurations such as firewall rules and audit policies, software deployment and updates, desktop and user environment restrictions, logon and logoff scripts, system and application configuration settings
 
-The KAPE artifcat structure shows filesystem artifacts (filesystem triage collection) pulled from the root of C: so this drive structure was reconstructed. The Security logs for this machine didnt contain events 5136/37 event codes so I assuming that this is a regular user machine who recieves GPOs from a centrally managed domain controller, the machine cannot generate them, the audit policy wasnt enabled, or the artifact collection didnt include the relevant logs. When the centrally managed machine applies a GPO for this machine, what artifacts within this C:/ drive exist locally for it to execute?
+The KAPE artifcat structure shows filesystem artifacts (filesystem triage collection) pulled from the root of C: so this drive structure was reconstructed. The GPO ran the script so two things can be covered: the script itself, a file and the config that instructs the OS to run the script
 
-a copy of policy files, a comp to retrieve those files and a comp that executes the policy settings/scripts?
+instructions on the config part: What script to run, when to run it, where the scipt is located. without this, how would the OS know to execute it?
+find GPO configs that have the instructions to execute scripts, prob at startup since this is a code exec/persist method: the registry hives?
+
+which reg hive or hives would point me to this GPO config data for this machine within this reconstructed C:/ drive? SYSTEM, SECURITY, SOFTWARE, SAM?
+Searching the SOFTWARE hive to pull out this config metadata: script name, its path and the GPO name executing this script at startup.....
+
+I searched for .bat and came across the script and the script location but I still need to find the GPO that deployed this
+
+- script name: `\\WIN-499DAFSKAR7\Data\scripts\setup.bat` -- network location?
+- script location: `Microsoft\Windows\CurrentVersion\Group Policy\Scripts\Startup\0\0` and `Microsoft\Windows\CurrentVersion\Group Policy\State\Machine\Scripts\Startup\0\0`
+
+So its storing GPO script data in `Group Policy\Scripts` for config and `Group Policy\State` for policy state tracking
+
+I went to browse that path within the same SOFTWARE hive (the metadata for the group policy) -> `Microsoft\Windows\CurrentVersion\Group Policy\Scripts\Startup\0`
+and found the GPO name that deployed the config and executed this script.bat. Its **"DeploySetup"** and looking at the PSScriptOrder set to 1, the setup.bat file is the first startup script executed. This GPO lives in SYSVOL which makes sense since thats the domain-wide share folder where GPO files are stored. 
 
 
 
