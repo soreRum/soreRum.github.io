@@ -7,3 +7,5 @@ theme: null
 collections:
   posts:
     output: true
+
+highlighter: rouge
