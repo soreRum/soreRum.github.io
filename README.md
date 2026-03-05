@@ -1,4 +1,4 @@
-# Risk1tAll Security Blog
+# gabem thoughts
 
 Mini writeups live here.
 
