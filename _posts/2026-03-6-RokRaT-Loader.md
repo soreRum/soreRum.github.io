@@ -1,5 +1,6 @@
 ### Malware: APT 37’s RokRaT Loader Analysis
 **Capability:** RokRaT Loader (Stage 1)
+
 **Tradecraft:**
 
 API Resolution via Hashing…dynamically…at runtime…yea…itll call this API func via a function pointer. When I opened this loader in PE Studio and looked at the import section I only saw two API funcs: WSAStartup and LoadLibrary. I assumed the loader might be resolving its APIs at runtime, but needed to confirm that in a disass. 
