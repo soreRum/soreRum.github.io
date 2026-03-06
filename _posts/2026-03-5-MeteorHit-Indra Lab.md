@@ -4,6 +4,8 @@
 
 Initial investigations reveal that attackers compromised the Active Directory (AD) system and deployed wiper malware across multiple machines. You have been provided with forensic artifacts collected via KAPE SANS Triage from one of the affected machines to determine how the attackers gained access, the scope of the malware's deployment, and what critical systems or data were impacted before the shutdown
 
+what i will have avail: logs, registry, forensic artifacts from the KAPE filesystem reconstruction
+
 Building the mental model, the attack chain:
 --------------------------------------------
 I need to understand what GPOs are and how they can be abused to eventually answer this first question
@@ -66,10 +68,16 @@ so far the attack chain (mental model) looks like this:
 - GPO startup script → setup.bat execution
 - USN Journal → env.cab staged on disk
 - $MFT → reconstruct path (C:\ProgramData\Microsoft\env\env.cab)
-- CAB archive expanded with built-in Windows tool  <- I need to find what built-in tool extracted this archive before it deleted itself
+- CAB archive expanded with built-in Windows tool  
 - archive inside env.cab extracted with password
-- Malware components deployed
+- Malware components deployed -- this is where Q3 comes in
 - env.cab deleted to remove staging artifact
 
 Q3: `The attacker employed password-protected archives to conceal malicious files, making it important to uncover the password used for extraction. Identifying this password is key to accessing the contents and analyzing the attack further. What is the password used to extract the malicious files?`
+So first thing I wanted to do was analyze what events took place after the first six file operations associated with env.cab in the USN Journal. Since env.cab appeared to act as a staging archive, I wanted to see if any additional files were dropped shortly afterward that could represent the next stage in the attack.  Shortly after the env.cab activity, I observed the creation of bcd.rar in the USN Journal at around 16:04:17. The USN entries showed file operations such as FileCreate, DataOverwrite, DataExtend, and IndexableChange, which indicates that the file was created and written to disk during that time window. Since the challenge states that the attacker used password-protected archives to conceal malicious files, the presence of bcd.rar, a RAR archive, stood out as a likely candidate. RAR archives commonly support password protection, making them a practical method for attackers to hide payloads from casual inspection. At this point, the goal becomes determining how bcd.rar was extracted and identifying the password used during that extraction. Archive extraction tools such as RAR or 7-Zip accept passwords through command-line arguments, and when these tools execute on a system, the process creation logs can capture those command-line arguments. So, the next step is to examine process creation events in the system logs to identify the extraction tool that executed bcd.rar and determine the password that was supplied as a command-line argument during extraction.
 
+env.cab
+└── bcd.rar
+    └── malware components
+
+    
