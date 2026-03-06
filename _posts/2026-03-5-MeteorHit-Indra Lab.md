@@ -102,8 +102,8 @@ CurrentDirectory: C:\ProgramData\Microsoft\env\
 **Disabling Network Adapters** -> A more aggressive attempt to disable network interfaces:
 ```
 Image: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
-CommandLine: powershell -Command "Get-WmiObject -class Win32_NetworkAdapter | ForEach { If ($_.NetEnabled) { $_.Disable() } }"
-CurrentDirectory: C:\ProgramData\Microsoft\env\ #iterate through all network adapters and disable any that are currently enabled, cutting off network connectivity entirely which tracks with wiper malware or destructive attack operations.
+CommandLine: powershell -Command "Get-WmiObject -class Win32_NetworkAdapter | ForEach { If ($_.NetEnabled) { $_.Disable() } }" #iterate through all network adapters and disable any that are currently enabled, cutting off network connectivity entirely which tracks with wiper malware or destructive attack operations.
+CurrentDirectory: C:\ProgramData\Microsoft\env\ 
 ```
 **Additional File Created During Archive Extraction**
 ```
