@@ -79,6 +79,21 @@ So far the attack chain (mental model) looks like this:
 
 Q4: `Several commands were executed to add exclusions to Windows Defender, preventing it from scanning specific files. This behavior is commonly used by attackers to ensure that malicious files are not detected by the system's built-in antivirus. Tracking these exclusion commands is crucial for identifying which files have been protected from antivirus scans. What is the name of the first file added to the Windows Defender exclusion list?`
 
+Still in sysmon checking Event ID 1 logs. First AV like query spotted was a recon check for a specific security software, Kaspersky -> `reg query "HKLM\SOFTWARE\KasperskyLab"` still under the working directory C:\ProgramData\Microsoft\env with the parent process still being setup.bat. If kaspersky was present, the malware wouldve taken a different route depending on its capabilities/tradecraft. Right after this reg query, a Windows Defender exclusion command was spotted. Here is the CommandLine -> `powershell -Command "Add-MpPreference -Force -ExclusionPath '"C:\ProgramData\Microsoft\env"\update.bat'"` Add-MpPreference is a PS cmdlet used to modify Windows Defender settings, -ExclusionPath adds a file exclusion in this case but also directories, update.bat is the file being excluded and -Force will suppress prompts. 
+
+So far the attack chain (mental model) looks like this:
+- Registry artifacts → malicious GPO identified (DeploySetup)
+- GPO startup script → setup.bat execution
+- USN Journal → env.cab staged on disk
+- $MFT → reconstruct path (C:\ProgramData\Microsoft\env\env.cab)
+- CAB archive expanded using built-in Windows utility (expand.exe)
+- RAR archive (programs.rar) written to disk from env.cab
+- RAR archive extracted using Rar.exe with password supplied via command-line argument (-phackemall)
+- Malware components deployed — password used to extract archive: hackemall
+- Attacker checks for presence of other antivirus software → reg query "HKLM\SOFTWARE\KasperskyLab"
+- Windows Defender exclusion added using PowerShell → Add-MpPreference -Force -ExclusionPath "C:\ProgramData\Microsoft\env\update.bat"
+- First file added to Windows Defender exclusion list → update.bat
+- env.cab deleted to remove staging artifact
 
 ### Some other goodies from Sysmon Event 1 logs
 
