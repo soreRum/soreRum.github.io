@@ -66,5 +66,18 @@ Q3: `The attacker employed password-protected archives to conceal malicious file
 
 So first thing I wanted to do was analyze what events took place after the first six file operations associated with env.cab in the USN Journal. Since env.cab appeared to act as a staging archive, I wanted to see if any additional files were dropped shortly afterward that could represent the next stage in the attack. Shortly after the env.cab activity, I observed the creation of bcd.rar in the USN Journal at around 16:04:17. The USN entries showed file operations such as FileCreate, DataOverwrite, DataExtend, and IndexableChange, which indicates that the file was created and written to disk during that time window. Since the challenge states that the attacker used password-protected archives to conceal malicious files, the presence of bcd.rar, a RAR archive, stood out as a likely candidate. RAR archives commonly support password protection, making them a practical method for attackers to hide payloads from casual inspection. At this point, the goal becomes determining how bcd.rar was extracted and identifying the password used during that extraction. Archive extraction tools such as RAR or 7-Zip accept passwords through command-line arguments, and when these tools execute on a system, the process creation logs can capture those command-line arguments. So, the next step is to examine process creation events in the system logs to identify the extraction tool that executed bcd.rar and determine the password that was supplied as a command-line argument during extraction. Upon reviewing the process execution logs, I identified a command that executed the RAR extraction utility, which showed the following command line: `"Rar.exe" x "C:\ProgramData\Microsoft\env\programs.rar" -phackemall` This command indicates that Rar.exe was used to extract the archive located in the staging directory. The x parameter instructs the tool to extract the archive with its directory structure, while the -p flag specifies the password used to unlock the archive. From this command-line argument, it can be determined that the password used to extract the malicious archive was: **hackemall**. This confirms that the attacker used a password-protected RAR archive as an additional layer of obfuscation, requiring the correct password to extract and deploy the malware components during the later stages of the attack.
 
+So far the attack chain (mental model) looks like this:
+- Registry artifacts → malicious GPO identified (DeploySetup)
+- GPO startup script → setup.bat execution
+- USN Journal → env.cab staged on disk
+- $MFT → reconstruct path (C:\ProgramData\Microsoft\env\env.cab)
+- CAB archive expanded using built-in Windows utility (expand.exe)
+- RAR archive (programs.rar) written to disk from env.cab
+- RAR archive extracted using Rar.exe with password supplied via command-line argument (-phackemall)
+- Malware components deployed — password used to extract archive: hackemall
+- env.cab deleted to remove staging artifact
+
+Q4: `Several commands were executed to add exclusions to Windows Defender, preventing it from scanning specific files. This behavior is commonly used by attackers to ensure that malicious files are not detected by the system's built-in antivirus. Tracking these exclusion commands is crucial for identifying which files have been protected from antivirus scans. What is the name of the first file added to the Windows Defender exclusion list?`
+
 
     
