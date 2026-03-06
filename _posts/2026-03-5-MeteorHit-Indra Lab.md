@@ -62,22 +62,14 @@ Following this process revealed the container file used in the staging phase of 
 This CAB file is a Microsoft archive format used to compress and bundle multiple files into a single container. In this case, the env.cab file acts as a staging container that houses malware components, configuration files, and other resources required for later stages of the attack. Using a .cab archive provides several advantages for attackers. It allows them to package multiple components together, reduce file size through compression, and avoid dropping many suspicious files onto the system at once. It also enables the use of Living-off-the-Land (LoTL) techniques, since Windows includes built-in utilities capable of expanding CAB archives, allowing attackers to extract the staged components without introducing additional tools onto the system.
 
 so far the attack chain (mental model) looks like this:
-
-Registry artifacts → malicious GPO identified (DeploySetup)
-↓
-GPO startup script → setup.bat execution
-↓
-USN Journal → env.cab staged on disk
-↓
-$MFT → reconstruct path (C:\ProgramData\Microsoft\env\env.cab)
-↓
-CAB archive expanded with built-in Windows tool  <- I need to find what built-in tool extracted this archive before it deleted itself
-↓
-archive inside env.cab extracted with password
-↓
-Malware components deployed
-↓
-env.cab deleted to remove staging artifact
+- Registry artifacts → malicious GPO identified (DeploySetup)
+- GPO startup script → setup.bat execution
+- USN Journal → env.cab staged on disk
+- $MFT → reconstruct path (C:\ProgramData\Microsoft\env\env.cab)
+- CAB archive expanded with built-in Windows tool  <- I need to find what built-in tool extracted this archive before it deleted itself
+- archive inside env.cab extracted with password
+- Malware components deployed
+- env.cab deleted to remove staging artifact
 
 Q3: `The attacker employed password-protected archives to conceal malicious files, making it important to uncover the password used for extraction. Identifying this password is key to accessing the contents and analyzing the attack further. What is the password used to extract the malicious files?`
 
