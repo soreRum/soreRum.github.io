@@ -80,4 +80,34 @@ So far the attack chain (mental model) looks like this:
 Q4: `Several commands were executed to add exclusions to Windows Defender, preventing it from scanning specific files. This behavior is commonly used by attackers to ensure that malicious files are not detected by the system's built-in antivirus. Tracking these exclusion commands is crucial for identifying which files have been protected from antivirus scans. What is the name of the first file added to the Windows Defender exclusion list?`
 
 
+### Some other goodies from Sysmon Event 1 logs
+
+Group Policy Startup Script Execution -> A process creation event shows cmd.exe launching the malicious startup script setup.bat from the SYSVOL share:
+```
+Image: C:\Windows\System32\cmd.exe
+CommandLine: C:\Windows\system32\cmd.exe /c ""\\WIN-499DAFSKAR7\Data\scripts\setup.bat" "
+ParentImage: C:\Windows\System32\gpscript.exe
+ParentCommandLine: gpscript.exe /Startup
+User: NT AUTHORITY\SYSTEM
+CurrentDirectory: \\abc.local\SysVol\abc.local\Policies\{8C069217-9EBB-454D-BE84-32317C017A0C}\Machine\Scripts\Startup\
+```
+So gpscript.exe executed the malicious script setup.bat which was stored on the SYSVOL network share. The script was executed during system startup with elevated privs since we see NT AUTHORITY\SYSTEM.
+
+The attacker was performing light recon on the target and potential network connectivity disruption:  `CommandLine: cmd.exe /c hostname` and
+```
+Image: C:\Windows\System32\ipconfig.exe   
+CommandLine: ipconfig /release    #release the DHCP lease disconnecting the machine fro its current network config
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+```
+a more aggressive attempt to disable network interfaces:
+```
+Image: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+CommandLine: powershell -Command "Get-WmiObject -class Win32_NetworkAdapter | ForEach { If ($_.NetEnabled) { $_.Disable() } }"
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+```
+
+
+
+
+
     
