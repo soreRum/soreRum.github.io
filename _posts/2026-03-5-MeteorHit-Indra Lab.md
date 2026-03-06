@@ -41,5 +41,24 @@ so far: Registry → Policy Metadata → GPO Name
 
 Q2: `During the investigation, a specific file containing critical components necessary for the later stages of the attack was found on the system. This file, expanded using a built-in tool, played a crucial role in staging the malware. What is the name of the file, and where was it located on the system? Please provide the full file path`
 
-So my thinking is finding a file that the attacker(s) placed on the machine that needs to be expanded to deploy multiple componenets. Im dealing with a file activity and execution behavior + I have these filesystem artifacts that can be of use to uncover this full name + full path on disk. Two areas of artifact focus are the USN Journal ($J) and prefetch records. Prefetch records info when an exe runs on the machine (which prog executed, when it ran, files the program interacted with). Maybe this path can lead to the built-in Windows util that was used to expand a file.  USN Journal records file system changes like files created, modified, renamed, deleted, etc and it can maybe help identify when the file appeared on disk, the full path and activity. The tools used for each are: MFTECmd for USN Journal and PECmd for Prefetch. Lets see if I can pull the tool and its path. 
+So my thinking is finding a file that the attacker(s) placed on the machine that needs to be expanded to deploy multiple components for the later stages of the attack. I’m dealing with file activity behavior, and I have these filesystem artifacts that can be useful in uncovering the full file name and full path on disk. The main artifact focus here is the USN Journal ($J). The USN Journal records file system activity, including:
+- files created
+- files modified
+- files renamed
+- files deleted
+
+This artifact can help identify when a file appeared on disk or when bursts of file activity occurred, which could indicate archive extraction or malware staging activity. The tool used to analyze the USN Journal is MFTECmd.Using the USN Journal output, I can look for file activity around the timeline of the malicious GPO execution, since the startup script deployed through the GPO likely triggered the staging process shortly afterward. Earlier in the investigation, the GPO policy responsible for executing the malicious script had a last write timestamp of 16:04:11, so I focused on file activity occurring shortly after that time. By sorting and filtering the USN Journal output around that timeframe, I was able to identify suspicious file activity beginning around 16:04:16, which closely correlates with the policy execution timeline. The USN entries for env.cab show a sequence of operations such as FileCreate, DataExtend, DataOverwrite, and BasicInfoChange, which indicates the file was created and written to disk at that time. This sequence of events typically occurs when a file is first created and its contents are written by a process. Later USN entries for the same file show additional activity such as DataOverwrite and FileDelete, indicating the file was modified and eventually deleted around 16:08:35. This behavior is consistent with a temporary staging file, where an archive is written to disk, its contents are extracted, and the archive is removed afterward. The USN Journal output typically does not contain the full file path, because it references files using File Reference Numbers (FRN) rather than directory paths. In the USN output, env.cab was associated with File Reference Number 97892 and Parent FRN 97053. To resolve the full location of the file, I pivoted to the $MFT output, which maps those file reference numbers to their actual directory structure.
+
+Looking up FRN 97892 in the $MFT output revealed an entry showing the directory path .\ProgramData\Microsoft\env with the file name env.cab. Reconstructing this directory with the system drive results in the full file path:
+
+`C:\ProgramData\Microsoft\env\env.cab`
+
+The timestamps in the $MFT entry also matched the behavior observed in the USN Journal, showing the file being created at 16:04:16 and later modified and removed around 16:08:35, further confirming the file’s role as a temporary staging archive during the attack.
+
+Following this process revealed the container file used in the staging phase of the attack, located at:
+
+`C:\ProgramData\Microsoft\env\env.cab`
+
+This CAB archive likely contained compressed components required for later stages of the attack, which were expanded using a built-in Windows utility as part of the malware deployment process. Attackers often use compressed archives to stage malware, and Windows includes built-in utilities for expanding compressed files such as CAB archives.
+
 
