@@ -82,7 +82,7 @@ Q4: `Several commands were executed to add exclusions to Windows Defender, preve
 
 ### Some other goodies from Sysmon Event 1 logs
 
-Group Policy Startup Script Execution -> A process creation event shows cmd.exe launching the malicious startup script setup.bat from the SYSVOL share:
+**Group Policy Startup Script Execution** -> A process creation event shows cmd.exe launching the malicious startup script setup.bat from the SYSVOL share:
 ```
 Image: C:\Windows\System32\cmd.exe
 CommandLine: C:\Windows\system32\cmd.exe /c ""\\WIN-499DAFSKAR7\Data\scripts\setup.bat" "
@@ -93,19 +93,23 @@ CurrentDirectory: \\abc.local\SysVol\abc.local\Policies\{8C069217-9EBB-454D-BE84
 ```
 So gpscript.exe executed the malicious script setup.bat which was stored on the SYSVOL network share. The script was executed during system startup with elevated privs since we see NT AUTHORITY\SYSTEM.
 
-The attacker was performing light recon on the target and potential network connectivity disruption:  `CommandLine: cmd.exe /c hostname` and
+**Reconnaissance and Network Disruption Commands** -> The attacker appears to perform light reconnaissance and potential network disruption through additional commands executed by the script: `CommandLine: cmd.exe /c hostname` and
 ```
 Image: C:\Windows\System32\ipconfig.exe   
 CommandLine: ipconfig /release    #release the DHCP lease disconnecting the machine fro its current network config
 CurrentDirectory: C:\ProgramData\Microsoft\env\
 ```
-a more aggressive attempt to disable network interfaces:
+**Disabling Network Adapters** -> A more aggressive attempt to disable network interfaces:
 ```
 Image: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
 CommandLine: powershell -Command "Get-WmiObject -class Win32_NetworkAdapter | ForEach { If ($_.NetEnabled) { $_.Disable() } }"
-CurrentDirectory: C:\ProgramData\Microsoft\env\
+CurrentDirectory: C:\ProgramData\Microsoft\env\ #iterate through all network adapters and disable any that are currently enabled, cutting off network connectivity entirely which tracks with wiper malware or destructive attack operations.
 ```
-
+**Additional File Created During Archive Extraction**
+```
+TargetFilename: C:\ProgramData\Microsoft\env\cache.bat #an addtional script here 
+Image: C:\ProgramData\Microsoft\env\Rar.exe
+```
 
 
 
