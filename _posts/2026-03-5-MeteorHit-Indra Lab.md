@@ -57,7 +57,7 @@ So far the attack chain (mental model) looks like this:
 - USN Journal → env.cab staged on disk
 - $MFT → reconstruct path (C:\ProgramData\Microsoft\env\env.cab)
 - CAB archive expanded using built-in Windows utility (expand.exe)
-- RAR archive (bcd.rar) written to disk from env.cab
+- RAR archive (programs.rar) written to disk from env.cab
 - RAR archive extracted using password-protected command
 - Malware components deployed — this is where Q3 comes in
 - env.cab deleted to remove staging artifact
@@ -91,12 +91,12 @@ ParentCommandLine: gpscript.exe /Startup
 User: NT AUTHORITY\SYSTEM
 CurrentDirectory: \\abc.local\SysVol\abc.local\Policies\{8C069217-9EBB-454D-BE84-32317C017A0C}\Machine\Scripts\Startup\
 ```
-So gpscript.exe executed the malicious script setup.bat which was stored on the SYSVOL network share. The script was executed during system startup with elevated privs since we see NT AUTHORITY\SYSTEM.
+So gpscript.exe executed the malicious script setup.bat which was stored on the SYSVOL network share. The script was executed during system startup with elevated privs since we see NT AUTHORITY\SYSTEM. Proves execution-level confirmation
 
 **Reconnaissance and Network Disruption Commands** -> The attacker appears to perform light reconnaissance and potential network disruption through additional commands executed by the script: `CommandLine: cmd.exe /c hostname` and
 ```
 Image: C:\Windows\System32\ipconfig.exe   
-CommandLine: ipconfig /release    #release the DHCP lease disconnecting the machine fro its current network config
+CommandLine: ipconfig /release    #release the DHCP lease disconnecting the machine from its current network configuration
 CurrentDirectory: C:\ProgramData\Microsoft\env\
 ```
 **Disabling Network Adapters** -> A more aggressive attempt to disable network interfaces:
@@ -107,7 +107,7 @@ CurrentDirectory: C:\ProgramData\Microsoft\env\ #iterate through all network ada
 ```
 **Additional File Created During Archive Extraction**
 ```
-TargetFilename: C:\ProgramData\Microsoft\env\cache.bat #an addtional script here 
+TargetFilename: C:\ProgramData\Microsoft\env\cache.bat #an additional script likely deployed as part of the extracted payload
 Image: C:\ProgramData\Microsoft\env\Rar.exe
 ```
 
