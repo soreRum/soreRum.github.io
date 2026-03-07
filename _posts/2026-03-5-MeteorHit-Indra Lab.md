@@ -6,7 +6,7 @@ Initial investigations reveal that attackers compromised the Active Directory (A
 
 **The artifacts I moved between during this investigation:** Registry, USN, MFT, Sysmon, VirusTotal
 
-**The malware behavior identified during this investigation:** GPO propagation, archive staging, AV evasion, scheduled execution, domain removal, boot destruction, screen locker
+**The malware behavior identified during this investigation:** GPO propagation, archive staging, AV evasion, scheduled task execution, domain removal, boot destruction, screen locker
 
 Building the mental model, the attack chain:
 --------------------------------------------
