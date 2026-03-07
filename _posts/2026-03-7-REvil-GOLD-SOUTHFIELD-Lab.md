@@ -57,83 +57,40 @@ The ransomware created the ransom note:
 
 # Q3 --- Locate the ransomware executable
 
-## Splunk Query
+**Splunk Query:** `index="revil" event.code=1 winlog.event_data.CommandLine="*facebook*"`
 
-    index="revil" event.code=1 winlog.event_data.CommandLine="*facebook*"
-
-## Result
-
+**Result:**
 -   CommandLine:
     `"C:\Users\Administrator\Downloads\facebook assistant.exe"`
--   Image: `C:\Users\Administrator\Downloads\facebook assistant.exe`
+-   Image: `C:\Users\Administrator\Downloads\facebook assistant.exe` <- **located**
 -   ProcessId: **5348**
 -   ParentImage: `C:\Windows\explorer.exe`
 -   ParentProcessId: **244**
 
-## Execution Chain
+**Execution Chain so far:** explorer.exe (PID 244) -> facebook assistant.exe (PID 5348) -> PowerShell.exe (PID 1860)
 
-    explorer.exe (PID 244) -> facebook assistant.exe (PID 5348) -> PowerShell.exe (PID 1860)
-
-## Conclusion
-
-The ransomware executable is located at:
-
-    C:\Users\Administrator\Downloads\facebook assistant.exe
-
-This suggests the malware was likely executed after being downloaded by
-the user.
 
 ------------------------------------------------------------------------
 
-# Q4 --- Command used to disrupt system recovery
+### Q4 --- Command used to disrupt system recovery
 
-Ransomware commonly deletes **Volume Shadow Copies** to prevent
-recovery.
+**Suspicious PowerShell Command**: `powershell -e RwBlAHQALQBXAG0AaQBPAGIAagBlAGMAdAAgAFcAaQBuADMAMgBfAFMAaABhAGQAbwB3AGMAbwBwAHkAIAB8ACAARgBvAHIARQBhAGMAaAAtAE8AYgBqAGUAYwB0ACAAewAkAF8ALgBEAGUAbABlAHQAZQAoACkAOwB9AA==`
 
-## Suspicious PowerShell Command
+**Decoded Command:** `Get-WmiObject Win32_Shadowcopy | ForEach-Object {$_.Delete();}`
 
-    powershell -e RwBlAHQALQBXAG0AaQBPAGIAagBlAGMAdAAgAFcAaQBuADMAMgBfAFMAaABhAGQAbwB3AGMAbwBwAHkAIAB8ACAARgBvAHIARQBhAGMAaAAtAE8AYgBqAGUAYwB0ACAAewAkAF8ALgBEAGUAbABlAHQAZQAoACkAOwB9AA==
-
-## Decoded Command
-
-    Get-WmiObject Win32_Shadowcopy | ForEach-Object {$_.Delete();}
-
-### Purpose
-
-Deletes Windows **Volume Shadow Copies**, preventing file recovery.
 
 ------------------------------------------------------------------------
 
-# Timeline of Attack
-
--   **16:09:28** -\> `wevtutil.exe cl "Windows PowerShell"` -\> clears
-    PowerShell logs
--   **16:09:53** -\> Shadow copies deleted
--   **16:10:14** -\> Ransom note created
-
-------------------------------------------------------------------------
-
-# Final Attack Chain
+### Final Attack Chain
 
     explorer.exe (PID 244) -> facebook assistant.exe (PID 5348) -> PowerShell.exe (PID 1860) -> clears logs -> deletes shadow copies -> creates ransom note C:\Users\Public\Videos\5uizv5660t-readme.txt
 
 ------------------------------------------------------------------------
 
-# Key Indicators of Compromise (IOCs)
+### IOCs
 
-## Malicious Executable
-
-    C:\Users\Administrator\Downloads\facebook assistant.exe
-
-## Ransom Note
-
-    C:\Users\Public\Videos\5uizv5660t-readme.txt
-
-## Suspicious PowerShell Activity
-
-    Get-WmiObject Win32_Shadowcopy | ForEach-Object {$_.Delete();}
-
-## Log Clearing Activity
-
-    wevtutil.exe cl "Windows PowerShell"
+**Malicious Executable**: `C:\Users\Administrator\Downloads\facebook assistant.exe`
+**Ransom Note:** `C:\Users\Public\Videos\5uizv5660t-readme.txt`
+**Suspicious PowerShell Activity:** `Get-WmiObject Win32_Shadowcopy | ForEach-Object {$_.Delete();}`
+**Log Clearing Activity:** `wevtutil.exe cl "Windows PowerShell"`
 
