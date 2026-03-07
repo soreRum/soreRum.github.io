@@ -1,4 +1,5 @@
 # REvil Ransomware Investigation -- Splunk (Sysmon Logs)
+
 ------------------------------------------------------------------------
 
 # Q1 --- Identify the ransom note filename
@@ -9,17 +10,17 @@
 
 ## Relevant Event
 
--   **Sysmon Event ID:** 11 (FileCreate)
--   **Timestamp:** `2023-09-07T16:10:14.827Z`
+-   Sysmon Event ID: **11 (FileCreate)**
+-   Timestamp: `2023-09-07T16:10:14.827Z`
 
 ### Target Filename
 
     C:\Users\Public\Videos\5uizv5660t-readme.txt
 
-### Process responsible
+### Process Responsible
 
-    Image: C:\Users\Administrator\Downloads\facebook assistant.exe
-    PID: 5348
+-   Image: `C:\Users\Administrator\Downloads\facebook assistant.exe`
+-   PID: **5348**
 
 ## Conclusion
 
@@ -37,21 +38,16 @@ The ransomware created the ransom note:
 
 ## Relevant Process Information
 
-  -----------------------------------------------------------------------------------------------------------------------------
-  Field                               Value
-  ----------------------------------- -----------------------------------------------------------------------------------------
-  OriginalFileName                    PowerShell.EXE
-
-  ProcessId                           1860
-
-  ParentImage                         C:`\Users`{=tex}`\Administrator`{=tex}`\Downloads`{=tex}`\facebook `{=tex}assistant.exe
-
-  ParentProcessId                     **5348**
-  -----------------------------------------------------------------------------------------------------------------------------
+-   OriginalFileName: **PowerShell.EXE**
+-   ProcessId: **1860**
+-   ParentImage:
+    `C:\Users\Administrator\Downloads\facebook assistant.exe`
+-   ParentProcessId: **5348**
 
 ## Interpretation
 
-PowerShell was launched by the ransomware executable.
+-   PowerShell was launched by the ransomware executable.
+-   The ransomware process ID is **5348**.
 
 ### Ransomware PID
 
@@ -67,23 +63,16 @@ PowerShell was launched by the ransomware executable.
 
 ## Result
 
-| Field | Value |
-|------|------|
-| CommandLine | `"C:\Users\Administrator\Downloads\facebook assistant.exe"` |
-| Image | `C:\Users\Administrator\Downloads\facebook assistant.exe` |
-| ProcessId | `5348` |
-| ParentImage | `C:\Windows\explorer.exe` |
-| ParentProcessId | `244` |
-
-  -------------------------------------------------------------------------------------------------------------------------------
+-   CommandLine:
+    `"C:\Users\Administrator\Downloads\facebook assistant.exe"`
+-   Image: `C:\Users\Administrator\Downloads\facebook assistant.exe`
+-   ProcessId: **5348**
+-   ParentImage: `C:\Windows\explorer.exe`
+-   ParentProcessId: **244**
 
 ## Execution Chain
 
-    explorer.exe (PID 244)
-            ↓
-    facebook assistant.exe (PID 5348)
-            ↓
-    PowerShell.exe (PID 1860)
+    explorer.exe (PID 244) -> facebook assistant.exe (PID 5348) -> PowerShell.exe (PID 1860)
 
 ## Conclusion
 
@@ -117,26 +106,16 @@ Deletes Windows **Volume Shadow Copies**, preventing file recovery.
 
 # Timeline of Attack
 
-    16:09:28  wevtutil.exe cl "Windows PowerShell"  → clears logs
-    16:09:53  Shadow copies deleted
-    16:10:14  Ransom note created
+-   **16:09:28** -\> `wevtutil.exe cl "Windows PowerShell"` -\> clears
+    PowerShell logs
+-   **16:09:53** -\> Shadow copies deleted
+-   **16:10:14** -\> Ransom note created
 
 ------------------------------------------------------------------------
 
 # Final Attack Chain
 
-    Explorer launches executable
-            ↓
-    facebook assistant.exe (PID 5348)
-            ↓
-    PowerShell.exe (PID 1860)
-            ↓
-    Clears PowerShell logs
-            ↓
-    Deletes shadow copies
-            ↓
-    Creates ransom note
-    C:\Users\Public\Videos\5uizv5660t-readme.txt
+    explorer.exe (PID 244) -> facebook assistant.exe (PID 5348) -> PowerShell.exe (PID 1860) -> clears logs -> deletes shadow copies -> creates ransom note C:\Users\Public\Videos\5uizv5660t-readme.txt
 
 ------------------------------------------------------------------------
 
@@ -154,6 +133,7 @@ Deletes Windows **Volume Shadow Copies**, preventing file recovery.
 
     Get-WmiObject Win32_Shadowcopy | ForEach-Object {$_.Delete();}
 
-## Log Clearing
+## Log Clearing Activity
 
     wevtutil.exe cl "Windows PowerShell"
+
