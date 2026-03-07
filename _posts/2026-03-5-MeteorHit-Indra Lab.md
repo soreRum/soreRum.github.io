@@ -4,7 +4,9 @@
 
 Initial investigations reveal that attackers compromised the Active Directory (AD) system and deployed wiper malware across multiple machines. You have been provided with forensic artifacts collected via KAPE SANS Triage from one of the affected machines to determine how the attackers gained access, the scope of the malware's deployment, and what critical systems or data were impacted before the shutdown
 
-what i will have avail: logs, registry, forensic artifacts from the KAPE filesystem reconstruction
+**The artifacts I moved between during this investigation:** Registry, USN, MFT, Sysmon, VirusTotal
+
+**The malware behavior identified during this investigation:** GPO propagation, archive staging, AV evasion, scheduled execution, domain removal, boot destruction, screen locker
 
 Building the mental model, the attack chain:
 --------------------------------------------
@@ -21,9 +23,9 @@ about the abuse
 
 about GPO: GPOs have access controls associated  with them and are centrally managed in Active Directory. They are used  to manage security and operational settings across domain systems. GPOs  can handle settings such as: password and account lockout policies, security configurations such as firewall rules and audit policies, software deployment and updates, desktop and user environment restrictions, logon and logoff scripts, system and application configuration settings
 
-The KAPE artifcat structure shows filesystem artifacts (filesystem triage collection) pulled from the root of C: so this drive structure was reconstructed. The GPO ran the script so two things can be covered: the script itself, a file and the config that instructs the OS to run the script
+The KAPE artifact structure shows filesystem artifacts (filesystem triage collection) pulled from the root of C: so this drive structure was reconstructed. The GPO ran the script so two things can be covered: the script itself, a file and the config that instructs the OS to run the script
 
-instructions on the config part: What script to run, when to run it, where the scipt is located. without this, how would the OS know to execute it?
+instructions on the config part: What script to run, when to run it, where the script is located. without this, how would the OS know to execute it?
 find GPO configs that have the instructions to execute scripts, prob at startup since this is a code exec/persist method: the registry hives?
 
 which reg hive or hives would point me to this GPO config data for this machine within this reconstructed C:/ drive? SYSTEM, SECURITY, SOFTWARE, SAM?
@@ -60,7 +62,7 @@ So far the attack chain (mental model) looks like this:
 - RAR archive (programs.rar) written to disk from env.cab
 - RAR archive extracted using password-protected command
 - Malware components deployed — this is where Q3 comes in
-- env.cab deleted to remove staging artifact
+- archive overwritten and deleted to remove staging artifacts (env.cab)
 
 Q3: `The attacker employed password-protected archives to conceal malicious files, making it important to uncover the password used for extraction. Identifying this password is key to accessing the contents and analyzing the attack further. What is the password used to extract the malicious files?`
 
@@ -75,7 +77,7 @@ So far the attack chain (mental model) looks like this:
 - RAR archive (programs.rar) written to disk from env.cab
 - RAR archive extracted using Rar.exe with password supplied via command-line argument (-phackemall)
 - Malware components deployed — password used to extract archive: hackemall
-- env.cab deleted to remove staging artifact
+- archive overwritten and deleted to remove staging artifacts (env.cab)
 
 Q4: `Several commands were executed to add exclusions to Windows Defender, preventing it from scanning specific files. This behavior is commonly used by attackers to ensure that malicious files are not detected by the system's built-in antivirus. Tracking these exclusion commands is crucial for identifying which files have been protected from antivirus scans. What is the name of the first file added to the Windows Defender exclusion list?`
 
@@ -93,7 +95,7 @@ So far the attack chain (mental model) looks like this:
 - Attacker checks for presence of other antivirus software → reg query "HKLM\SOFTWARE\KasperskyLab"
 - Windows Defender exclusion added using PowerShell → Add-MpPreference -Force -ExclusionPath "C:\ProgramData\Microsoft\env\update.bat"
 - First file added to Windows Defender exclusion list → update.bat
-- env.cab deleted to remove staging artifact
+- archive overwritten and deleted to remove staging artifacts (env.cab) 
 
 Q5: `A scheduled task has been configured to execute a file after a set delay. Understanding this delay is important for investigating the timing of potential malicious activity. How many seconds after the task creation time is it scheduled to run?`
 
@@ -122,7 +124,7 @@ So far the attack chain (mental model) looks like this:
 - Scheduled task created using schtasks.exe → task name mstask configured to execute C:\ProgramData\Microsoft\env\env.exe
 - Scheduled task execution delay calculated using PowerShell → (Get-Date).AddMinutes(3.5)
 - Payload execution scheduled 210 seconds after task creation time
-- env.cab deleted to remove staging artifact
+- archive overwritten and deleted to remove staging artifacts (env.cab)
 
 Q6: `After the malware execution, the wmic utility was used to unjoin the computer system from a domain or workgroup. Tracking this operation is essential for identifying system reconfigurations or unauthorized changes. What is the Process ID (PID) of the utility responsible for performing this action?`
 
@@ -168,7 +170,7 @@ So far the attack chain (mental model) looks like this:
 - Scheduled task executed by Task Scheduler service (svchost.exe -k netsvcs -s Schedule) → env.exe launched with configuration file C:\temp\msconf.conf
 - Payload executes system reconfiguration command → wmic computersystem call unjoindomainorworkgroup
 - WMIC process removes system from domain → Process ID (PID): 7492
-- env.cab deleted to remove staging artifact
+- archive overwritten and deleted to remove staging artifacts (env.cab)
 
 Q7: `The malware executed a command to delete the Windows Boot Manager, a critical component responsible for loading the operating system during startup. This action can render the system unbootable, leading to serious operational disruptions and making recovery more difficult. What command did the malware use to delete the Windows Boot Manager?`
 
@@ -205,7 +207,7 @@ CurrentDirectory: C:\Windows\system32\
 ParentCommandLine: C:\ProgramData\Microsoft\env\env.exe C:\temp\msconf.conf
 ParentUser: NT AUTHORITY\SYSTEM
 ```
-This command created a scheduled task configured to run at system startup, the task name is Aa153!EGzN. This task is configured to run with SYSTEM privs at the highest run level. Lastly, it will execute the payload env.exe with its pen pal config file msconf.conf. Persistence established so the payload can continue to run whenever the machine boots but we all know this malware has one plan and its to wipe this local machine and all machines under the malicious GPO to the shadow relm as quick/successful as possible. Im too lazy to update the attack chain (mental model). 
+This command created a scheduled task configured to run at system startup, the task name is Aa153!EGzN. This task is configured to run with SYSTEM privs at the highest run level. Lastly, it will execute the payload env.exe with its pen pal config file msconf.conf. Persistence established so the payload can continue to run whenever the machine boots but we all know this malware has one plan and its to wipe this local machine and all machines under the malicious GPO to the shadow relm as quick/successful as possible.
 
 Q9: `A malicious program was used to lock the screen, preventing users from accessing the system. Investigating this malware is important to identify its behavior and mitigate its impact. What is the name of this malware? (not the filename)`
 
@@ -339,5 +341,4 @@ ParentCommandLine: C:\ProgramData\Microsoft\env\env.exe C:\temp\msconf.conf
 ParentUser: NT AUTHORITY\SYSTEM
 ```
 These commands are executed to most likely take ownership/modify permissions of Windows lock screen directories so it can replace/control lock screen assets, which will support the BreakWin (mssetup) payload.
-
 
