@@ -14,6 +14,7 @@ If the hash computed from the DLL’s EAT matches one of the pre-made hashes, th
 Now I will pivot to the code side to re-create at a very basic level the API Hashing operation 
 
 
+
 Next I will pivot to building a mental model of how certain code blocks during the API hashing process look in Assembly
 
 
