@@ -1,61 +1,40 @@
-# REvil Ransomware Investigation -- Splunk (Sysmon Logs)
+## REvil Ransomware Investigation -- Splunk (Sysmon Logs)
 
 ------------------------------------------------------------------------
 
-# Q1 --- Identify the ransom note filename
+### Q1 --- Identify the ransom note filename
 
-## Splunk Query
+**Splunk Query:** `index="revil" event.code=11 winlog.event_data.TargetFilename="*.txt*"`
 
-    index="revil" event.code=11 winlog.event_data.TargetFilename="*.txt*"
-
-## Relevant Event
-
+**Relevant Event:**
 -   Sysmon Event ID: **11 (FileCreate)**
 -   Timestamp: `2023-09-07T16:10:14.827Z`
 
-### Target Filename
+**Target Filename:** `C:\Users\Public\Videos\5uizv5660t-readme.txt` <- **ransom note**
 
-    C:\Users\Public\Videos\5uizv5660t-readme.txt
-
-### Process Responsible
-
--   Image: `C:\Users\Administrator\Downloads\facebook assistant.exe`
--   PID: **5348**
-
-## Conclusion
-
-The ransomware created the ransom note:
-
-    5uizv5660t-readme.txt
+**Process Responsible:** 
+- `Image: `C:\Users\Administrator\Downloads\facebook assistant.exe``
+- PID: **5348**
 
 ------------------------------------------------------------------------
 
-# Q2 --- Identify the ransomware process ID
+### Q2 --- Identify the ransomware process ID
 
-## Splunk Query
+**Splunk Query:** `index="revil" event.code=1 earliest="09/07/2023:16:00:00" latest="09/07/2023:16:15:00" winlog.event_data.ParentCommandLine="*facebook*"`
 
-    index="revil" event.code=1 earliest="09/07/2023:16:00:00" latest="09/07/2023:16:15:00" winlog.event_data.ParentCommandLine="*facebook*"
-
-## Relevant Process Information
-
+**Relevant Process Information:**
 -   OriginalFileName: **PowerShell.EXE**
 -   ProcessId: **1860**
 -   ParentImage:
     `C:\Users\Administrator\Downloads\facebook assistant.exe`
--   ParentProcessId: **5348**
+-   ParentProcessId: **5348** <- **ransomware PID**
 
-## Interpretation
+**Comment:** facebook assistant spawning a child PS process to do what?
 
--   PowerShell was launched by the ransomware executable.
--   The ransomware process ID is **5348**.
-
-### Ransomware PID
-
-    5348
 
 ------------------------------------------------------------------------
 
-# Q3 --- Locate the ransomware executable
+### Q3 --- Locate the ransomware executable
 
 **Splunk Query:** `index="revil" event.code=1 winlog.event_data.CommandLine="*facebook*"`
 
@@ -67,7 +46,7 @@ The ransomware created the ransom note:
 -   ParentImage: `C:\Windows\explorer.exe`
 -   ParentProcessId: **244**
 
-**Execution Chain so far:** explorer.exe (PID 244) -> facebook assistant.exe (PID 5348) -> PowerShell.exe (PID 1860)
+**Execution Chain so far:** `explorer.exe (PID 244) -> facebook assistant.exe (PID 5348) -> PowerShell.exe (PID 1860)`
 
 
 ------------------------------------------------------------------------
@@ -83,14 +62,14 @@ The ransomware created the ransom note:
 
 ### Final Attack Chain
 
-    explorer.exe (PID 244) -> facebook assistant.exe (PID 5348) -> PowerShell.exe (PID 1860) -> clears logs -> deletes shadow copies -> creates ransom note C:\Users\Public\Videos\5uizv5660t-readme.txt
+`explorer.exe (PID 244) -> facebook assistant.exe (PID 5348) -> PowerShell.exe (PID 1860) -> clears logs -> deletes shadow copies -> creates ransom note C:\Users\Public\Videos\5uizv5660t-readme.txt`
 
 ------------------------------------------------------------------------
 
 ### IOCs
 
-**Malicious Executable**: `C:\Users\Administrator\Downloads\facebook assistant.exe`
-**Ransom Note:** `C:\Users\Public\Videos\5uizv5660t-readme.txt`
-**Suspicious PowerShell Activity:** `Get-WmiObject Win32_Shadowcopy | ForEach-Object {$_.Delete();}`
-**Log Clearing Activity:** `wevtutil.exe cl "Windows PowerShell"`
+- **Malicious Executable**: `C:\Users\Administrator\Downloads\facebook assistant.exe`
+- **Ransom Note:** `C:\Users\Public\Videos\5uizv5660t-readme.txt`
+- **Suspicious PowerShell Activity:** `Get-WmiObject Win32_Shadowcopy | ForEach-Object {$_.Delete();}`
+- **Log Clearing Activity:** `wevtutil.exe cl "Windows PowerShell"`
 
