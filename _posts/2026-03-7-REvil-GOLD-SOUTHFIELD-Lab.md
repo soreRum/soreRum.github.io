@@ -1,12 +1,4 @@
 # REvil Ransomware Investigation -- Splunk (Sysmon Logs)
-
-## Objective
-
-Investigate a ransomware infection affecting a Windows machine using
-**Sysmon logs in Splunk** to determine: - Ransom note filename -
-Ransomware process ID - Executable location - Commands used to disrupt
-recovery
-
 ------------------------------------------------------------------------
 
 # Q1 --- Identify the ransom note filename
