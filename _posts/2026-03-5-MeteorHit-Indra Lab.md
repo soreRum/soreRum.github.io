@@ -95,6 +95,18 @@ So far the attack chain (mental model) looks like this:
 - First file added to Windows Defender exclusion list → update.bat
 - env.cab deleted to remove staging artifact
 
+Q5: `A scheduled task has been configured to execute a file after a set delay. Understanding this delay is important for investigating the timing of potential malicious activity. How many seconds after the task creation time is it scheduled to run?`
+
+looking for schtasks.exe, powershell/wmi usage for scheduled tasks.
+```
+CommandLine: C:\Windows\system32\cmd.exe /c powershell -command "(Get-Date).AddMinutes(3.5).ToString('HH:mm:ss')"
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+
+OriginalFileName: schtasks.exe
+CommandLine: schtasks  /CREATE /SC ONCE /ST 09:08:13 /TN "mstask" /RL HIGHEST /RU SYSTEM /TR "\""C:\ProgramData\Microsoft\env\env.exe"\" C:\temp\msconf.conf"
+```
+This is the scheduled task named mstask, how convienent ("ms" prefix) that runs once at a specified start time, in this case 3.5 minutes (210 seconds) post creation. (most likely delayed for evasion purposes) This taks is configured to execute with SYSTEM privs and the highest run level, so the payload can run with elevated perms. The command before the scheduled tasks creation was used to take the current system time, add 3.5 minutes to it, format the result as a timestamp to then be used as the scheduled task start time. 
+
 ### Some other goodies from Sysmon Event 1 logs
 
 **Group Policy Startup Script Execution** -> A process creation event shows cmd.exe launching the malicious startup script setup.bat from the SYSVOL share:
@@ -126,7 +138,50 @@ TargetFilename: C:\ProgramData\Microsoft\env\cache.bat #an additional script lik
 Image: C:\ProgramData\Microsoft\env\Rar.exe
 ```
 
+**Additional file added to the Windows Defender exclusion list** 
+```
+CommandLine: powershell  -Command "Add-MpPreference -Force -ExclusionPath '"C:\ProgramData\Microsoft\env"\programs.rar'" 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+CommandLine: powershell  -Command "Add-MpPreference -Force -ExclusionPath '"C:\ProgramData\Microsoft\env"\cache.bat'" 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+CommandLine: powershell  -Command "Add-MpPreference -Force -ExclusionPath '"C:\ProgramData\Microsoft\env"\ms.rar'" 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+CommandLine: powershell  -Command "Add-MpPreference -Force -ExclusionPath '"C:\ProgramData\Microsoft\env"\msrun.bat'" 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+CommandLine: powershell  -Command "Add-MpPreference -Force -ExclusionPath '"C:\ProgramData\Microsoft\env"\mssetup.exe'" 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+CommandLine: powershell  -Command "Add-MpPreference -Force -ExclusionPath '"C:\ProgramData\Microsoft\env"\msconf.conf'" 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+CommandLine: powershell  -Command "Add-MpPreference -Force -ExclusionPath '"C:\ProgramData\Microsoft\env"\bcd.bat'" 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+CommandLine: powershell  -Command "Add-MpPreference -Force -ExclusionPath '"C:\ProgramData\Microsoft\env\env.exe"'" 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
 
+ParentImage: C:\Windows\System32\cmd.exe
+ParentCommandLine: C:\Windows\system32\cmd.exe /c ""\\WIN-499DAFSKAR7\Data\scripts\setup.bat" "
+```
 
+**RaR-ing these archives** -> Once bcd.bat was added to the exclusion path, then bcd.rar archive was de-compressed with WinRaR. same goes for the rest found
+```
+CommandLine: "Rar.exe"  x "C:\ProgramData\Microsoft\env\bcd.rar" -phackemall
+CurrentDirectory: C:\ProgramData\Microsoft\env\
 
-    
+CommandLine: "Rar.exe"  x "C:\ProgramData\Microsoft\env\ms.rar" -phackemall
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+```
+
+**Viewing the Boot Configuration Data store**
+```
+CommandLine: C:\Windows\system32\cmd.exe /c bcdedit /v | findstr identifier
+# verbose output and findstr is filtering the output and only printing the identifier info for each boot entry -- signal potential wiper malware 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+```
+
+**Reg key modification** -> HKLM applying to all users. These two commands force the system lock screen background to a specific image (C:\temp\mscap.jpg) via Windows policy settings
+```
+OriginalFileName: reg.exe
+CommandLine: reg  add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" /v LockScreenImagePath /t REG_SZ /d C:\temp\mscap.jpg /f
+
+CommandLine: reg  add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" /v LockScreenImageUrl /t REG_SZ /d C:\temp\mscap.jpg /f
+CurrentDirectory: C:\ProgramData\Microsoft\env\
+```
