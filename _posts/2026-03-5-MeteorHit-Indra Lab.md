@@ -226,7 +226,7 @@ This sample displays clear characteristics of a Windows screen locker or desktop
 
 Q10: `The disk shows a pattern where malware overwrites data (potentially with zero-bytes) and then deletes it, a behavior commonly linked to Wiper malware activity. The USN (Update Sequence Number) is vital for tracking filesystem changes on an NTFS volume, enabling investigators to trace when files are created, modified, or deleted, even if they are no longer present. This is critical for building a timeline of file activity and detecting potential tampering. What is the USN associated with the deletion of the file msuser.reg?`
 
-
+I returned back to the USN Journal ($J) output because it records low-level filesystem activity (file creation, mod, del, rename). We needed to target the USN associated with the deletion of msuser.reg and here is the FileDelete|Close flag operation below:
 
 `msuser.reg,.reg,99635,1,99629,1,,11721008,2024-09-24 16:08:41.5969160,FileDelete|Close,Archive,11721008,C:\Users\Administrator\Desktop\Start Here\Artifacts\C\$Extend\$J`
 The USN is a 64-bit integer so 11 72 10 08 -> 64-bit (8-byte) beautiful..done
@@ -311,5 +311,33 @@ CommandLine: reg  add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVers
 CurrentDirectory: C:\ProgramData\Microsoft\env\
 ```
 
-CommandLine: ping  localhost -n 20 
-CurrentDirectory: C:\ProgramData\Microsoft\env\
+**Classic Living-off-the-Land (LotL) malware behavior below used during this wiper operation**
+
+```
+takeown.exe
+icacls.exe
+cmd.exe
+wmic
+bcdedit
+schtasks
+```
+
+**One cool piece of commands to setup the screen-locking operation**
+```
+CommandLine: C:\Windows\System32\cmd.exe /c takeown.exe /F "C:\Windows\Web\Screen" /R /A /D Y
+CommandLine: C:\Windows\System32\cmd.exe /c icacls.exe "C:\Windows\Web\Screen" /grant System:(OI)(CI)F /T
+CommandLine: C:\Windows\System32\cmd.exe /c icacls.exe "C:\Windows\Web\Screen" /grant Administrators:(OI)(CI)F /T
+CommandLine: C:\Windows\System32\cmd.exe /c icacls.exe "C:\Windows\Web\Screen" /reset /T
+CommandLine: C:\Windows\System32\cmd.exe /c takeown.exe /F "C:\ProgramData\Microsoft\Windows\SystemData" /R /A /D Y
+CommandLine: C:\Windows\System32\cmd.exe /c icacls.exe "C:\ProgramData\Microsoft\Windows\SystemData" /grant System:(OI)(CI)F /T
+CommandLine: C:\Windows\System32\cmd.exe /c icacls.exe "C:\ProgramData\Microsoft\Windows\SystemData" /grant Administrators:(OI)(CI)F /T
+C:\Windows\System32\cmd.exe /c icacls.exe "C:\ProgramData\Microsoft\Windows\SystemData\S-1-5-18\ReadOnly" /reset /T
+all under this: CurrentDirectory: C:\Windows\system32\
+
+and all under this Parent:
+ParentCommandLine: C:\ProgramData\Microsoft\env\env.exe C:\temp\msconf.conf
+ParentUser: NT AUTHORITY\SYSTEM
+```
+These commands are executed to most likely take ownership/modify permissions of Windows lock screen directories so it can replace/control lock screen assets, which will support the BreakWin (mssetup) payload.
+
+
