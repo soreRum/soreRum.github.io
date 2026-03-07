@@ -107,6 +107,96 @@ CommandLine: schtasks  /CREATE /SC ONCE /ST 09:08:13 /TN "mstask" /RL HIGHEST /R
 ```
 This is the scheduled task named mstask, how convienent ("ms" prefix) that runs once at a specified start time, in this case 3.5 minutes (210 seconds) post creation. (most likely delayed for evasion purposes) This taks is configured to execute with SYSTEM privs and the highest run level, so the payload can run with elevated perms. The command before the scheduled tasks creation was used to take the current system time, add 3.5 minutes to it, format the result as a timestamp to then be used as the scheduled task start time. 
 
+So far the attack chain (mental model) looks like this:
+- Registry artifacts → malicious GPO identified (DeploySetup)
+- GPO startup script → setup.bat execution
+- USN Journal → env.cab staged on disk
+- $MFT → reconstruct path (C:\ProgramData\Microsoft\env\env.cab)
+- CAB archive expanded using built-in Windows utility (expand.exe)
+- RAR archive (programs.rar) written to disk from env.cab
+- RAR archive extracted using Rar.exe with password supplied via command-line argument (-phackemall)
+- Malware components deployed — password used to extract archive: hackemall
+- Attacker checks for presence of other antivirus software → reg query "HKLM\SOFTWARE\KasperskyLab"
+- Windows Defender exclusion added using PowerShell → Add-MpPreference -Force -ExclusionPath "C:\ProgramData\Microsoft\env\update.bat"
+- First file added to Windows Defender exclusion list → update.bat
+- Scheduled task created using schtasks.exe → task name mstask configured to execute C:\ProgramData\Microsoft\env\env.exe
+- Scheduled task execution delay calculated using PowerShell → (Get-Date).AddMinutes(3.5)
+- Payload execution scheduled 210 seconds after task creation time
+- env.cab deleted to remove staging artifact
+
+Q6: `After the malware execution, the wmic utility was used to unjoin the computer system from a domain or workgroup. Tracking this operation is essential for identifying system reconfigurations or unauthorized changes. What is the Process ID (PID) of the utility responsible for performing this action?`
+
+So Im guessing the scheduled task, env.exe + custom ms config file will fire once 3.5 minutes hit and itll execute this wmic utility to unjoin the computer system from a domain or workgroup.
+```
+CommandLine: C:\ProgramData\Microsoft\env\env.exe C:\temp\msconf.conf
+CurrentDirectory: C:\Windows\system32\
+
+ParentCommandLine: C:\Windows\system32\svchost.exe -k netsvcs -p -s Schedule
+ParentUser: NT AUTHORITY\SYSTEM
+```
+The scheduled task fired and now
+```
+CommandLine: C:\Windows\System32\cmd.exe /c wmic computersystem where name="%%computername%%" call unjoindomainorworkgroup
+CurrentDirectory: C:\Windows\system32\
+
+ParentCommandLine: C:\ProgramData\Microsoft\env\env.exe C:\temp\msconf.conf
+ParentUser: NT AUTHORITY\SYSTEM
+```
+wmic is removing a computer system from a domain or workgroup. And what might that computer system be?
+```
+ProcessId: 7492
+CommandLine: wmic  computersystem where name="DESKTOP-VBIOB4B" call unjoindomainorworkgroup
+CurrentDirectory: C:\Windows\system32\
+```
+Its DESKTOP-VBIOB4B. The PID of wmic that performed this action is 7492.
+
+So far the attack chain (mental model) looks like this:
+- Registry artifacts → malicious GPO identified (DeploySetup)
+- GPO startup script → setup.bat execution
+- USN Journal → env.cab staged on disk
+- $MFT → reconstruct path (C:\ProgramData\Microsoft\env\env.cab)
+- CAB archive expanded using built-in Windows utility (expand.exe)
+- RAR archive (programs.rar) written to disk from env.cab
+- RAR archive extracted using Rar.exe with password supplied via command-line argument (-phackemall)
+- Malware components deployed — password used to extract archive: hackemall
+- Attacker checks for presence of other antivirus software → reg query "HKLM\SOFTWARE\KasperskyLab"
+- Windows Defender exclusion added using PowerShell → Add-MpPreference -Force -ExclusionPath "C:\ProgramData\Microsoft\env\update.bat"
+- First file added to Windows Defender exclusion list → update.bat
+- Scheduled task created using schtasks.exe → task name mstask configured to execute C:\ProgramData\Microsoft\env\env.exe
+- Scheduled task execution delay calculated using PowerShell → (Get-Date).AddMinutes(3.5)
+- Payload execution scheduled 210 seconds after task creation time
+- Scheduled task executed by Task Scheduler service (svchost.exe -k netsvcs -s Schedule) → env.exe launched with configuration file C:\temp\msconf.conf
+- Payload executes system reconfiguration command → wmic computersystem call unjoindomainorworkgroup
+- WMIC process removes system from domain → Process ID (PID): 7492
+- env.cab deleted to remove staging artifact
+
+Q7: `The malware executed a command to delete the Windows Boot Manager, a critical component responsible for loading the operating system during startup. This action can render the system unbootable, leading to serious operational disruptions and making recovery more difficult. What command did the malware use to delete the Windows Boot Manager?`
+
+After the WMIC domain unjoin operation, the payload env.exe executed with the configuration file msconf.conf continues its destructive actions. The malware then leverages the bcdedit.exe utility, which is used to manage the Boot Configuration Data (BCD) store, a critical component responsible for loading the operating system during startup.
+
+The first command executed was:
+```
+CommandLine: C:\Windows\System32\cmd.exe /c C:\Windows\Sysnative\bcdedit.exe -v
+CurrentDirectory: C:\Windows\system32\
+
+ParentCommandLine: C:\ProgramData\Microsoft\env\env.exe C:\temp\msconf.conf
+ParentUser: NT AUTHORITY\SYSTEM
+```
+The -v option instructs bcdedit to display all identifiers in full, which allows the malware to enumerate the GUIDs associated with boot entries in the BCD store, including the Windows Boot Manager. Once these identifiers are discovered, the malware proceeds to delete them using the following commands:
+```
+CommandLine: C:\Windows\System32\cmd.exe /c C:\Windows\Sysnative\bcdedit.exe /delete {9dea862c-5cdd-4e70-acc1-f32b344d4795} /f
+CommandLine: C:\Windows\System32\cmd.exe /c C:\Windows\Sysnative\bcdedit.exe /delete {9fb207e9-78a3-11ef-b883-b743eb480db3} /f
+CommandLine: C:\Windows\System32\cmd.exe /c C:\Windows\Sysnative\bcdedit.exe /delete {9fb207ea-78a3-11ef-b883-b743eb480db3} /f
+CommandLine: C:\Windows\System32\cmd.exe /c C:\Windows\Sysnative\bcdedit.exe /delete {b2721d73-1db4-4c62-bf78-c548a880142d} /f
+CurrentDirectory: C:\Windows\system32\
+
+ParentCommandLine: C:\ProgramData\Microsoft\env\env.exe C:\temp\msconf.conf
+ParentUser: NT AUTHORITY\SYSTEM
+```
+The /delete flag removes the specified boot entry from the Boot Configuration Data store, while the /f flag forces the deletion without prompting for confirmation. By deleting the Windows Boot Manager entries, the malware effectively corrupts the system's boot configuration, rendering the machine unable to load the operating system during startup.
+
+Q8: `The malware created a scheduled task to ensure persistence and maintain control over the compromised system. This task is configured to run with elevated privileges every time the system starts, ensuring the malware continues to execute. What is the name of the scheduled task created by the malware to maintain persistence?`
+
 ### Some other goodies from Sysmon Event 1 logs
 
 **Group Policy Startup Script Execution** -> A process creation event shows cmd.exe launching the malicious startup script setup.bat from the SYSVOL share:
@@ -185,3 +275,6 @@ CommandLine: reg  add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVers
 CommandLine: reg  add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP" /v LockScreenImageUrl /t REG_SZ /d C:\temp\mscap.jpg /f
 CurrentDirectory: C:\ProgramData\Microsoft\env\
 ```
+
+CommandLine: ping  localhost -n 20 
+CurrentDirectory: C:\ProgramData\Microsoft\env\
