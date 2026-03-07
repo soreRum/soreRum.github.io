@@ -197,6 +197,41 @@ The /delete flag removes the specified boot entry from the Boot Configuration Da
 
 Q8: `The malware created a scheduled task to ensure persistence and maintain control over the compromised system. This task is configured to run with elevated privileges every time the system starts, ensuring the malware continues to execute. What is the name of the scheduled task created by the malware to maintain persistence?`
 
+Looking again for schtasks.exe usage since thats the theme here. What do you know, following the timeline with the sysmon logs (Event 1), the trail leads right to this
+```
+CommandLine: C:\Windows\System32\cmd.exe /c schtasks /CREATE /SC ONSTART /TN "Aa153!EGzN" /RL HIGHEST /RU SYSTEM /TR "\"C:\ProgramData\Microsoft\env\env.exe\" \"C:\temp\msconf.conf\"" /F
+CurrentDirectory: C:\Windows\system32\
+
+ParentCommandLine: C:\ProgramData\Microsoft\env\env.exe C:\temp\msconf.conf
+ParentUser: NT AUTHORITY\SYSTEM
+```
+This command created a scheduled task configured to run at system startup, the task name is Aa153!EGzN. This task is configured to run with SYSTEM privs at the highest run level. Lastly, it will execute the payload env.exe with its pen pal config file msconf.conf. Persistence established so the payload can continue to run whenever the machine boots but we all know this malware has one plan and its to wipe this local machine and all machines under the malicious GPO to the shadow relm as quick/successful as possible. Im too lazy to update the attack chain (mental model). 
+
+Q9: `A malicious program was used to lock the screen, preventing users from accessing the system. Investigating this malware is important to identify its behavior and mitigate its impact. What is the name of this malware? (not the filename)`
+
+This bin + this /LOCK arg? This program is locking the system screen
+```
+CommandLine: "C:\temp\mssetup.exe" /LOCK
+CurrentDirectory: C:\Windows\system32\
+Hash lookup: SHA256=074BCC51B77D8E35B96ED444DC479B2878BF61BF7B07E4D7BD4CF136CC3C0DCE
+
+ParentCommandLine: C:\ProgramData\Microsoft\env\env.exe C:\temp\msconf.conf
+ParentUser: NT AUTHORITY\SYSTEM
+```
+Why lock? users screen is locked so it prevents interaction with the system. To find out the actual malwares name, because we all know that bin name was renamed to (ms)setup by the attacker to blend in, we use the sha256 hash, look it up using VirusTotal and with a whopping score of 55/72, one of the names given was **BreakWin**. Heres the description from VirusTotal:
+
+```
+This sample displays clear characteristics of a Windows screen locker or desktop-disrupting malware. It uses the 'BlockInput' API to disable keyboard and mouse input, hides the system cursor via 'ShowCursor(0)', and creates a topmost, maximized window ('SW_SHOWMAXIMIZED' and 'HWND_TOPMOST' via 'SetWindowPos'). Decompilation of sub_401212 and sub_4019a6 shows it specifically targets a bitmap located at 'C:\temp\mscap.bmp' to be drawn onto the screen using GDI functions like 'BitBlt' and 'CreateCompatibleDC'. These combined behaviors are intended to lock a user out of their system and force them to view a specific image, a common tactic in ransomware and screen-locking malware families.
+```
+
+Q10: `The disk shows a pattern where malware overwrites data (potentially with zero-bytes) and then deletes it, a behavior commonly linked to Wiper malware activity. The USN (Update Sequence Number) is vital for tracking filesystem changes on an NTFS volume, enabling investigators to trace when files are created, modified, or deleted, even if they are no longer present. This is critical for building a timeline of file activity and detecting potential tampering. What is the USN associated with the deletion of the file msuser.reg?`
+
+
+
+`msuser.reg,.reg,99635,1,99629,1,,11721008,2024-09-24 16:08:41.5969160,FileDelete|Close,Archive,11721008,C:\Users\Administrator\Desktop\Start Here\Artifacts\C\$Extend\$J`
+The USN is a 64-bit integer so 11 72 10 08 -> 64-bit (8-byte) beautiful..done
+
+
 ### Some other goodies from Sysmon Event 1 logs
 
 **Group Policy Startup Script Execution** -> A process creation event shows cmd.exe launching the malicious startup script setup.bat from the SYSVOL share:
