@@ -67,18 +67,14 @@ PowerShell was launched by the ransomware executable.
 
 ## Result
 
-  -------------------------------------------------------------------------------------------------------------------------------
-  Field                               Value
-  ----------------------------------- -------------------------------------------------------------------------------------------
-  CommandLine                         "C:`\Users`{=tex}`\Administrator`{=tex}`\Downloads`{=tex}`\facebook `{=tex}assistant.exe"
+| Field | Value |
+|------|------|
+| CommandLine | `"C:\Users\Administrator\Downloads\facebook assistant.exe"` |
+| Image | `C:\Users\Administrator\Downloads\facebook assistant.exe` |
+| ProcessId | `5348` |
+| ParentImage | `C:\Windows\explorer.exe` |
+| ParentProcessId | `244` |
 
-  Image                               C:`\Users`{=tex}`\Administrator`{=tex}`\Downloads`{=tex}`\facebook `{=tex}assistant.exe
-
-  ProcessId                           5348
-
-  ParentImage                         C:`\Windows`{=tex}`\explorer`{=tex}.exe
-
-  ParentProcessId                     244
   -------------------------------------------------------------------------------------------------------------------------------
 
 ## Execution Chain
