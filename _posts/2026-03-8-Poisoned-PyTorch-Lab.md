@@ -7,11 +7,17 @@ Scenario: `On 2 February 2026 (UTC), a developer at unucorb executed a model tra
 Just notes....
 
 Initial Access
-----------------
+--------------
 
-Initial access was achieved via a software supply-chain compromise involving the Python dependency PyTorch (torch). The torch package is a trusted third-party machine learning library that had been tampered with to include a malicious backdoor in this scenario. When the developer executed the model training script from Visual Studio Code on PC01, the Python interpreter imported the torch module as part of the application runtime. Because the installed version of the dependency had been compromised, malicious code embedded within the package executed automatically during the import process. The malicious code spawned a hidden PowerShell process which downloaded and executed a second-stage payload from the attacker-controlled host: **http://54.93.78.216/a**
-This established remote access to the workstation, initiating the attacker’s foothold in the environment. This attack is effective because developers inherently trust widely used dependencies, and importing a module in Python executes package initialization code automatically. As a result, malicious code embedded in a dependency can run without any additional user interaction beyond executing the application. Similar real-world incidents include:
-- PyPI malicious packages
-- npm dependency compromises
-- SolarWinds Orion supply-chain attack
-- Codecov supply-chain compromise
+Initial access was achieved via a software supply-chain compromise involving the Python dependency PyTorch (torch). The torch package is a trusted third-party machine learning library that had been tampered with to include a malicious backdoor in this scenario. When the developer executed the model training script from Visual Studio Code on PC01, the Python interpreter imported the torch module as part of the application runtime. Because the installed version of the dependency had been compromised, malicious code embedded within the package executed automatically during the import process. The malicious code spawned a hidden PowerShell process which downloaded and executed a second-stage payload from the attacker-controlled host: **http://<54.93.78.216>/a**
+This established remote access to the workstation, initiating the attacker’s foothold in the environment. This attack is effective because developers inherently trust widely used dependencies, and importing a module in Python executes package initialization code automatically. As a result, malicious code embedded in a dependency can run without any additional user interaction beyond executing the application.
+
+Execution
+---------
+
+The origin of this instrusion came from a script the developer ran in his AI/ML project directory, `C:\Users\michelvic\torch-inference-stack\training\train.py`.
+At 2026-02-02 01:17:01, torch lib already imported meaning the malicious PS command from above executed on PC01. Pivoting to outbound comms (Event ID 3 -- Sysmon Logs) from PC01 following the PS download, michelvic (worksation) contacted <54.93.78.216:80> to grab the first stage payload. This was at 2/2/2026 1:17:06 AM which coorelates with the powershell command execution seconds before. The IP was also visible above from the Sysmon Event ID 1 log too. 
+
+Discovery
+--------
+
