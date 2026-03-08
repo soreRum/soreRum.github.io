@@ -30,7 +30,7 @@ which most likely came from this -> powershell -nop -exec bypass -EncodedCommand
 ```
 What Im noticing is the attacker is supplying the target recon commands via PS as an encoded command which decodes right after to execute. 
 
-Persistence
+Persistence #1
 ----------
 
 The attacker dropped a secondary payload for persistence
@@ -68,12 +68,12 @@ This DLL peformed registry modification to persist the DLL. The benign-looking v
 ```
 timestamp: 2/2/2026 1:48:39 AM
 C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
-HKU\S-1-5-21-3415631042-2785832853-3881933999-1167\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\Updater
-rundll32.exe "C:\Users\michelvic\AppData\Roaming\updlate.dll",StartW
+HKU\S-1-5-21-3415631042-2785832853-3881933999-1167\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\Updater   # updlate.dll will run everytime the user logs in
+rundll32.exe "C:\Users\michelvic\AppData\Roaming\updlate.dll",StartW   
 UNUCORB\michelvic
 ```
 
-Privesc
+Failed Privesc
 -------
 
 The attacker did escalate privs but before that, a privesc attempt was made to abuse an installed Windows feature that failed
@@ -124,8 +124,8 @@ ForEach-Object { Get-Item $_ } # return the files that exist
 ```
 The attacker found exposed creds from unattend.xml. The attacker will most likely construct its lateral movement through these PS encoded commands as seen throughout the whole attack chain/investigation from the DLL that was placed to persist/run all these PS commands. 
 
-Lateral Movement
-----------------
+Successful Pirvesc + Persistence #2
+--------------------------------
 The attacker used credentials recovered from the deployment artifact to register a scheduled task named “Chroom Updates” via PowerShell. The task was configured to run a malicious DLL using rundll32.exe under the DOMAIN\domain.admin account with highest privileges, establishing persistence and enabling privileged execution on the compromised system.
 ```
 [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String("JABhAGMAdABpAG8AbgAgAD0AIABOAGUAdwAtAFMAYwBoAGUAZAB1AGwAZQBkAFQAYQBzAGsAQQBjAHQAaQBvAG4AIABgACAAIAAgAC0ARQB4AGUAYwB1AHQAZQAgACIAcgB1AG4AZABsAGwAMwAyAC4AZQB4AGUAIgAgAGAAIAAgACAALQBBAHIAZwB1AG0AZQBuAHQAIAAnACIAQwA6AFwAVQBzAGUAcgBzAFwAbQBpAGMAaABlAGwAdgBpAGMAXABBAHAAcABEAGEAdABhAFwAUgBvAGEAbQBpAG4AZwBcAHUAcABkAGwAYQB0AGUALgBkAGwAbAAiACwAUwB0AGEAcgB0AFcAJwA="))
@@ -143,5 +143,9 @@ Register-ScheduledTask `   -TaskName "Chroom Updates" `   -Action $action `   -U
 
 Start-ScheduledTask -TaskName "Chroom Updates" # Start the task
 ```
-Now the attacker is running as domain.admin instead of michelvic. The DLL also runs with elevated privs and its persisting again. 
+The scheduled task executes the malicious DLL under the DOMAIN\domain.admin account with highest privileges, allowing the attacker to run code with elevated domain credentials on PC01.
+
+Lateral Movement
+----------------
+
 
