@@ -110,4 +110,19 @@ under the same UNUCORB\michelvic user
 Credential Access
 ---------
 
-credential hunting file hunting: password, cred, config, xml, ini, txt, unattend, sysprep | well known creds leak: unattend.xml, sysgrep.inf, web.config, groups.xml, cred.xml
+After the failed privesc, the attacker moved to credential hunting and found a deployment artifact containing exposed creds. (It was powershell encoded)
+```
+[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String("IgBDADoAXAB1AG4AYQB0AHQAZQBuAGQALgB4AG0AbAAiACwAIAAiAEMAOgBcAFcAaQBuAGQAbwB3AHMAXABQAGEAbgB0AGgAZQByAFwAVQBuAGEAdAB0AGUAbgBkAC4AeABtAGwAIgAsACAAIgBDADoAXABXAGkAbgBkAG8AdwBzAFwAUABhAG4AdABoAGUAcgBcAFUAbgBhAHQAdABlAG4AZABcAFUAbgBhAHQAdABlAG4AZAAuAHgAbQBsACIALAAgACIAQwA6AFwAVwBpAG4AZABvAHcAcwBcAFMAeQBzAHQAZQBtADMAMgBcAHMAeQBzAHAAcgBlAHAALgBpAG4AZgAiACwAIAAiAEMAOgBcAFcAaQBuAGQAbwB3AHMAXABTAHkAcwB0AGUAbQAzADIAXABzAHkAcwBwAHIAZQBwAFwAcwB5AHMAcAByAGUAcAAuAHgAbQBsACIAIAB8ACAAVwBoAGUAcgBlAC0ATwBiAGoAZQBjAHQAIAB7ACAAVABlAHMAdAAtAFAAYQB0AGgAIAAkAF8AIAB9ACAAfAAgACAAIABGAG8AcgBFAGEAYwBoAC0ATwBiAGoAZQBjAHQAIAB7ACAARwBlAHQALQBJAHQAZQBtACAAJABfACAAfQA="))
+
+"C:\unattend.xml",
+"C:\Windows\Panther\Unattend.xml",
+"C:\Windows\Panther\Unattend\Unattend.xml",
+"C:\Windows\System32\sysprep.inf",
+"C:\Windows\System32\sysprep\sysprep.xml" | # up until here, these are a list of file commonly containing creds especially on the windows deployment config side
+Where-Object { Test-Path $_ } | # checks if the files exist
+ForEach-Object { Get-Item $_ } # return the files that exist
+```
+The attacker found exposed creds from unattend.xml. The attacker will most likely construct its lateral movement through these PS encoded commands as seen throughout the whole attack chain/investigation from the DLL that was placed to persist/run all these PS commands. 
+
+Lateral Movement
+----------------
