@@ -21,3 +21,15 @@ At 2026-02-02 01:17:01, torch lib already imported meaning the malicious PS comm
 Discovery
 --------
 
+So were dealing with a domain env that PC01 is aprt of. The attacker began performing recon to understand domain trust relatinships from PC01. The attacker most likely used a Windows native tool to perform that domnain trust enumeration. Here it is
+```
+nltestrk.exe
+"C:\Windows\system32\nltest.exe" /domain_trusts
+which most likely came from this -> powershell -nop -exec bypass -EncodedCommand bgBsAHQAZQBzAHQAIAAvAGQAbwBtAGEAaQBuAF8AdAByAHUAcwB0AHMA
+```
+What Im noticing is the attacker is supplying the target recon commands via PS as an encoded command which decodes right after to execute. 
+
+Peristence
+----------
+
+
