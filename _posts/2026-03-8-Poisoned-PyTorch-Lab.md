@@ -148,4 +148,9 @@ The scheduled task executes the malicious DLL under the DOMAIN\domain.admin acco
 Lateral Movement
 ----------------
 
+The attacker prepared for RDP-based lateral movement by adding the domain group unucorb.local\RDP Users to the local Remote Desktop Users group on PC01 using net1 localgroup. This grants members of that domain group permission to log in via RDP. The command was executed under NT AUTHORITY\SYSTEM, indicating it was performed with elevated privileges.
+```
+C:\Windows\system32\net1 localgroup "Remote Desktop Users" "unucorb.local\RDP Users" /add <- Add domain group "unucorb.local\RDP Users" to local group "Remote Desktop Users" so the result is that members of unucorb.local\RDP Users can now log in via RDP to PC01
 
+NT AUTHORITY\SYSTEM <- running as SYSTEM to perform this 
+```
