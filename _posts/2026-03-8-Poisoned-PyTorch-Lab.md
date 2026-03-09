@@ -16,7 +16,9 @@ Execution
 ---------
 
 The origin of this instrusion came from a script the developer ran in his AI/ML project directory, `C:\Users\michelvic\torch-inference-stack\training\train.py`.
-At 2026-02-02 01:17:01, torch lib already imported meaning the malicious PS command from above executed on PC01. Pivoting to outbound comms (Event ID 3 -- Sysmon Logs) from PC01 following the PS download, michelvic (worksation) contacted <54.93.78.216:80> to grab the first stage payload. This was at 2/2/2026 1:17:06 AM which coorelates with the powershell command execution seconds before. The IP was also visible above from the Sysmon Event ID 1 log too. 
+At 2026-02-02 01:17:01, torch lib already imported meaning the malicious PS command from above executed on PC01. Pivoting to outbound comms (Event ID 3 -- Sysmon Logs) from PC01 following the PS download, michelvic (worksation) contacted <54.93.78.216:80> to grab the first stage payload. This was at 2/2/2026 1:17:06 AM which coorelates with the powershell command execution seconds before. The IP was also visible above from the Sysmon Event ID 1 log too.
+
+My note to remember: Sysmon Event ID 3 records network connections initiated by a process. It includes the source host, destination IP, destination port, and the process responsible for the connection. This event is useful for identifying command-and-control traffic, payload downloads, or lateral movement attempts originating from a compromised host.
 
 Discovery
 --------
@@ -124,6 +126,8 @@ ForEach-Object { Get-Item $_ } # return the files that exist
 ```
 The attacker found exposed creds from unattend.xml. The attacker will most likely construct its lateral movement through these PS encoded commands as seen throughout the whole attack chain/investigation from the DLL that was placed to persist/run all these PS commands. 
 
+My note to remember: Sysmon Event ID 1 records process creation events, including the executable path and full command line used to launch the process. This allows analysts to identify malicious command execution, such as encoded PowerShell commands used for credential hunting, reconnaissance, or payload execution.
+
 Successful Pirvesc + Persistence #2
 --------------------------------
 The attacker used credentials recovered from the deployment artifact to register a scheduled task named “Chroom Updates” via PowerShell. The task was configured to run a malicious DLL using rundll32.exe under the DOMAIN\domain.admin account with highest privileges, establishing persistence and enabling privileged execution on the compromised system.
@@ -161,6 +165,8 @@ part 2
 
 Using the Windows Security log, Event ID 4720 was queried to identify newly created domain accounts. This event records when a user account is created and includes both the creator account (Subject) and the new account (Target/New Account). The search: `index=* source="WinEventLog:Security" EventCode=4720` revealed that a rogue account named welsam was created in the UNUCORB domain on the domain controller DC01.unucorb.local at approximately: 2026-02-02T03:15:18.136229200Z. The Subject Account Name field indicates the account responsible for the action was: domain.admin. This confirms that the attacker used the previously compromised domain.admin credentials to create the unauthorized domain account as a persistence mechanism.
 
+My note to remember: Windows Security Event ID 4720 records when a new user account is created in Active Directory. The event contains the Subject account (the user who created the account) and the New Account Name, allowing analysts to identify unauthorized domain accounts created by attackers for persistence.
+
 part 3
 
 The event shows that the previously created rogue account welsam was added to a privileged domain group shortly after its creation on the domain controller DC01.unucorb.local. Relevant fields from the event include:
@@ -175,6 +181,11 @@ TargetDomainName: UNUCORB
 TargetSid: UNUCORB\Domain Admins
 ```
 The SubjectUserName field confirms the action was performed using the previously compromised administrative account: SubjectUserName: domain.admin. The event occurred at approximately: 2026-02-02T03:15:31.289439500Z which is shortly after the rogue account welsam was created (Event 4720). This confirms that the attacker immediately escalated the account's privileges by adding it to the Domain Admins group, granting full administrative access across the domain and establishing long-term persistence within the environment.
+
+My note to remember: Windows Security Event ID 4728 records when a user is added to a security-enabled global group in Active Directory. The event shows the member being added, the target group, and the account that performed the action, making it useful for detecting privilege escalation through group membership changes.
+
+Pre-Encryption Operations and Ransomware Deployment
+---------------------------------------------------
 
 
 
