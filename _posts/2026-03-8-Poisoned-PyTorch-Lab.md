@@ -147,6 +147,7 @@ The scheduled task executes the malicious DLL under the DOMAIN\domain.admin acco
 
 Lateral Movement
 ----------------
+part 1
 
 The attacker prepared for RDP-based lateral movement by adding the domain group unucorb.local\RDP Users to the local Remote Desktop Users group on PC01 using net1 localgroup. This grants members of that domain group permission to log in via RDP. The command was executed under NT AUTHORITY\SYSTEM, indicating it was performed with elevated privileges.
 ```
@@ -155,3 +156,25 @@ Add domain group "unucorb.local\RDP Users" to local group "Remote Desktop Users"
 
 NT AUTHORITY\SYSTEM <- running as SYSTEM to perform this 
 ```
+
+part 2
+
+Using the Windows Security log, Event ID 4720 was queried to identify newly created domain accounts. This event records when a user account is created and includes both the creator account (Subject) and the new account (Target/New Account). The search: `index=* source="WinEventLog:Security" EventCode=4720` revealed that a rogue account named welsam was created in the UNUCORB domain on the domain controller DC01.unucorb.local at approximately: 2026-02-02T03:15:18.136229200Z. The Subject Account Name field indicates the account responsible for the action was: domain.admin. This confirms that the attacker used the previously compromised domain.admin credentials to create the unauthorized domain account as a persistence mechanism.
+
+part 3
+
+The event shows that the previously created rogue account welsam was added to a privileged domain group shortly after its creation on the domain controller DC01.unucorb.local. Relevant fields from the event include:
+```
+MemberSid: UNUCORB\welsam
+MemberName: cn=welsam maslew,CN=Users,DC=unucorb,DC=local
+```
+which identifies the rogue account being added to the group. The privileged group is identified in the following fields:
+```
+TargetUserName: Domain Admins
+TargetDomainName: UNUCORB
+TargetSid: UNUCORB\Domain Admins
+```
+The SubjectUserName field confirms the action was performed using the previously compromised administrative account: SubjectUserName: domain.admin. The event occurred at approximately: 2026-02-02T03:15:31.289439500Z which is shortly after the rogue account welsam was created (Event 4720). This confirms that the attacker immediately escalated the account's privileges by adding it to the Domain Admins group, granting full administrative access across the domain and establishing long-term persistence within the environment.
+
+
+
