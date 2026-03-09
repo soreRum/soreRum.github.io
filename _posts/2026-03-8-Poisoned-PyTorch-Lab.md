@@ -75,6 +75,10 @@ rundll32.exe "C:\Users\michelvic\AppData\Roaming\updlate.dll",StartW
 UNUCORB\michelvic
 ```
 
+My note to remember: Sysmon Event ID 13 records when a registry value is created or modified.
+This event helps detect persistence mechanisms such as Run keys used to
+execute malware when a user logs in.
+
 Failed Privesc
 -------
 
@@ -149,8 +153,8 @@ Start-ScheduledTask -TaskName "Chroom Updates" # Start the task
 ```
 The scheduled task executes the malicious DLL under the DOMAIN\domain.admin account with highest privileges, allowing the attacker to run code with elevated domain credentials on PC01.
 
-Lateral Movement
-----------------
+Lateral Movement + Privesc 
+--------------------------
 part 1
 
 The attacker prepared for RDP-based lateral movement by adding the domain group unucorb.local\RDP Users to the local Remote Desktop Users group on PC01 using net1 localgroup. This grants members of that domain group permission to log in via RDP. The command was executed under NT AUTHORITY\SYSTEM, indicating it was performed with elevated privileges.
