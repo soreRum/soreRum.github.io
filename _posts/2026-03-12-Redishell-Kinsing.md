@@ -10,9 +10,9 @@ misconfig-d CI/CD server running in a Docker container (Wowzas dev network) -> o
 
 protocol hierarchy shows some http, a couple icmp, a good amount of telnet, some tls, this protocol called kNet which immediately showed some no nos. (185.220.101.50, 192.168.192.6, 172.16.10.20)
 
-container subnet: 172.16.10.0/24 -- first compro machine is 172.16.10.10
-attacker IP: 185.220.101.50
-potentially the pivot subnet outside the container: 192.168.192.0/24
+- container subnet: 172.16.10.0/24 -- first compro machine is 172.16.10.10
+- attacker IP: 185.220.101.50
+- potentially the pivot subnet outside the container: 192.168.192.0/24
 
 
 2. Identifying attacker IP is critical for threat intelligence and blocking future connections. What is the attacker's command and control (C2) IP address?
@@ -23,7 +23,7 @@ attacker IP: 185.220.101.50
 
 looking at the http packets for initial access machine (172.16.10.10) this is how the attacker got remote access
 
-The first set of http req shows a client using curl/8.15.0 requesting the /script endpoint (Jenkis script console) from 172.16.10.10:8080. The server responded 200 OK with an HTML page. Headers identify the service as Jenkins 2.387.1 running on Jetty 10.0.13. The returned content is the Jenkins Script Console, an administrative interface used to run arbitrary Groovy code on the Jenkins server. My guess is the attacker will comm with this /script endpoint and send it malicious Java commands to run server side. Second set of http packets show a POST request via the curl command and its a Java command: `Form item: "script" = "println 'id'.execute().text"`. This command will execute the system command id and capture the output as a string. (id prints user info) RCE inbound! It returned this: `text="uid=1000(jenkins) gid=1000(jenkins) groups=1000(jenkins)`
+The first set of http req shows a client using curl/8.15.0 requesting the /script endpoint (Jenkis script console) from 172.16.10.10:8080. The server responded 200 OK with an HTML page. Headers identify the service as Jenkins 2.387.1 running on Jetty 10.0.13. The returned content is the Jenkins Script Console, an administrative interface used to run arbitrary Groovy code on the Jenkins server. My guess is the attacker will comm with this /script endpoint and send it malicious Java commands to run server side. Second set of http packets show a POST request via the curl command and its a Java command: `"println 'id'.execute().text"`. This command will execute the system command id and capture the output as a string. (id prints user info) RCE inbound! It returned this: `text="uid=1000(jenkins) gid=1000(jenkins) groups=1000(jenkins)`. Then this command: `println 'whoami'.execute().text` returned this: `text="jenkins`
 
 
 
